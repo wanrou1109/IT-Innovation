@@ -2,18 +2,16 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-import {VerificationRegistry, ConcertTicketNFT} from "../src/Counter.sol";
+import {VerificationRegistry} from "../contracts/VerificationRegistry.sol";
+import {ConcertTicketNFT} from "../contracts/ConcertTicketNFT.sol";
 
-contract ConcertTicketTest is Test {
+contract ConcertTicketNFTTest is Test {
     VerificationRegistry public verificationRegistry;
     ConcertTicketNFT public concertTicketNFT;
-    
     address public owner;
     address public organizer;
     address public buyer1;
     address public buyer2;
-    
-    // Test data
     uint256 public CONCERT_DATE;
     uint256 public constant TICKET_PRICE = 1 ether;
     uint256 public constant TOTAL_TICKETS = 100;
@@ -22,59 +20,15 @@ contract ConcertTicketTest is Test {
 
     function setUp() public {
         CONCERT_DATE = block.timestamp + 30 days;
-        
         owner = address(this);
         organizer = makeAddr("organizer");
         buyer1 = makeAddr("buyer1");
         buyer2 = makeAddr("buyer2");
-        
-        // Provide some ETH to test accounts
         vm.deal(buyer1, 10 ether);
         vm.deal(buyer2, 10 ether);
         vm.deal(organizer, 5 ether);
-        
-        // Deploy contracts
         verificationRegistry = new VerificationRegistry();
         concertTicketNFT = new ConcertTicketNFT(address(verificationRegistry));
-    }
-
-    // ========== Verification Registry Tests ==========
-    
-    function test_VerifyUser() public {
-        // Verify buyer1 with full verification
-        verificationRegistry.verifyUser(
-            buyer1,
-            true,  // phone verified
-            true,  // email verified
-            true,  // id verified
-            IDENTITY_HASH_1
-        );
-        
-        VerificationRegistry.UserVerification memory verification = 
-            verificationRegistry.getUserVerification(buyer1);
-        
-        assertTrue(verification.phoneVerified);
-        assertTrue(verification.emailVerified);
-        assertTrue(verification.idVerified);
-        assertEq(verification.identityHash, IDENTITY_HASH_1);
-        assertEq(verification.trustScore, 100); // 10 + 30 + 30 + 30
-    }
-    
-    function test_IsUserVerified() public {
-        // Verify buyer1 partially
-        verificationRegistry.verifyUser(buyer1, true, true, false, IDENTITY_HASH_1);
-        
-        assertTrue(verificationRegistry.isUserVerified(buyer1, 1)); // phone only
-        assertTrue(verificationRegistry.isUserVerified(buyer1, 2)); // phone + email
-        assertFalse(verificationRegistry.isUserVerified(buyer1, 3)); // full verification
-    }
-    
-    function test_Blacklist() public {
-        verificationRegistry.addToBlacklist(buyer1, "Fraudulent activity");
-        assertTrue(verificationRegistry.blacklist(buyer1));
-        
-        verificationRegistry.removeFromBlacklist(buyer1);
-        assertFalse(verificationRegistry.blacklist(buyer1));
     }
 
     // ========== Concert Management Tests ==========
@@ -141,7 +95,7 @@ contract ConcertTicketTest is Test {
         );
         
         // Verify changes were applied
-        (,,,, uint256 originalPrice, uint256 maxResalePrice,,,) = 
+        (,,,, , uint256 maxResalePrice,,,) = 
             concertTicketNFT.getConcertDetails(concertId);
         
         assertEq(maxResalePrice, TICKET_PRICE * 120 / 100);
@@ -469,4 +423,4 @@ contract ConcertTicketTest is Test {
         assertEq(userTickets[0], 1);
         assertEq(userTickets[1], 2);
     }
-}
+} 

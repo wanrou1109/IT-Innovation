@@ -2,7 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
-import {VerificationRegistry, ConcertTicketNFT} from "../src/Counter.sol";
+import {VerificationRegistry} from "../../contracts/VerificationRegistry.sol";
+import {ConcertTicketNFT} from "../../contracts/ConcertTicketNFT.sol";
 
 contract ConcertTicketScript is Script {
     VerificationRegistry public verificationRegistry;

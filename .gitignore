@@ -2,13 +2,27 @@
 cache/
 out/
 
+# Dependencies (external libraries)
+lib/
+
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
-# Docs
-docs/
-
 # Dotenv file
 .env
+
+# macOS files
+.DS_Store
+
+# Node modules (if using npm/yarn)
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
