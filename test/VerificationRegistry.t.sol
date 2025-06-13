@@ -20,13 +20,12 @@ contract VerificationRegistryTest is Test {
     function test_VerifyUser() public {
         verificationRegistry.verifyUser(
             buyer1,
-            true,  // phone verified
-            true,  // email verified
-            true,  // id verified
+            true, // phone verified
+            true, // email verified
+            true, // id verified
             IDENTITY_HASH_1
         );
-        VerificationRegistry.UserVerification memory verification = 
-            verificationRegistry.getUserVerification(buyer1);
+        VerificationRegistry.UserVerification memory verification = verificationRegistry.getUserVerification(buyer1);
         assertTrue(verification.phoneVerified);
         assertTrue(verification.emailVerified);
         assertTrue(verification.idVerified);
@@ -47,4 +46,4 @@ contract VerificationRegistryTest is Test {
         verificationRegistry.removeFromBlacklist(buyer1);
         assertFalse(verificationRegistry.blacklist(buyer1));
     }
-} 
+}

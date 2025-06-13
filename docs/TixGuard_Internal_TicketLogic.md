@@ -1,6 +1,6 @@
 # TixGuard 票券發行與交易邏輯（內部技術說明）
 
-本文件說明 TixGuard 智能合約（`src/Counter.sol`）中票券發行、購買、轉賣等核心限制邏輯，並標註對應程式碼依據，供內部技術人員查閱。
+本文件說明 TixGuard 智能合約系統中票券發行、購買、轉賣等核心限制邏輯，並標註對應程式碼依據，供內部技術人員查閱。
 
 ---
 
@@ -110,7 +110,10 @@
 ---
 
 ## 6. 參考檔案
-- 主合約：`src/Counter.sol`
-- 測試案例：`test/Counter.t.sol`
+- 身份驗證合約：`contracts/VerificationRegistry.sol`
+- 主要票券合約：`contracts/ConcertTicketNFT.sol`
+- 驗證測試案例：`test/VerificationRegistry.t.sol`
+- 票券測試案例：`test/ConcertTicketNFT.t.sol`
+- 部署腳本：`scripts/deploy/DeployTixGuard.s.sol`
 
 如需查詢更細節邏輯，請直接檢視上述檔案。 
