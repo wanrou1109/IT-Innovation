@@ -1,0 +1,333 @@
+/* App.css - 應用主樣式 */
+
+.App {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Layout Styles */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* 防止 flex 子元素溢出 */
+}
+
+.page-content {
+  flex: 1;
+  padding: var(--space-lg);
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  
+  .page-content {
+    padding: var(--space-md);
+  }
+}
+
+/* 連接錢包提示樣式 */
+.connect-wallet-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  text-align: center;
+  padding: var(--space-2xl);
+}
+
+.connect-wallet-prompt h2 {
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-2xl);
+}
+
+.connect-wallet-prompt p {
+  color: var(--text-secondary);
+  font-size: var(--text-lg);
+  max-width: 400px;
+}
+
+/* 空狀態樣式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+  min-height: 200px;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-lg);
+  opacity: 0.6;
+}
+
+.empty-state h3 {
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+  font-size: var(--text-xl);
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* 加載狀態 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--bg-tertiary);
+  border-top: 3px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* 錯誤狀態 */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 3rem;
+  color: var(--color-error);
+  margin-bottom: var(--space-lg);
+}
+
+.error-message {
+  color: var(--color-error);
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-md);
+}
+
+.error-description {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* 成功狀態 */
+.success-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.success-icon {
+  font-size: 3rem;
+  color: var(--color-success);
+  margin-bottom: var(--space-lg);
+}
+
+.success-message {
+  color: var(--color-success);
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-md);
+}
+
+.success-description {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* 通用頁面標題 */
+.page-header {
+  margin-bottom: var(--space-xl);
+}
+
+.page-title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.page-subtitle {
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+
+/* 通用網格布局 */
+.grid {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 1024px) {
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-cols-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .grid-cols-4,
+  .grid-cols-3,
+  .grid-cols-2 { 
+    grid-template-columns: 1fr; 
+  }
+}
+
+/* 通用容器 */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-lg);
+}
+
+.section {
+  margin-bottom: var(--space-2xl);
+}
+
+.section-title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+}
+
+/* 分隔線 */
+.divider {
+  border: none;
+  height: 1px;
+  background-color: var(--border-primary);
+  margin: var(--space-xl) 0;
+}
+
+/* 標籤樣式 */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xs) var(--space-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.tag.primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.tag.success {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.tag.warning {
+  background-color: var(--color-warning);
+  color: white;
+}
+
+.tag.error {
+  background-color: var(--color-error);
+  color: white;
+}
+
+/* 通知樣式 */
+.notification {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-md);
+  border-left: 4px solid;
+}
+
+.notification.info {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.notification.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-left-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.notification.warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-left-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.notification.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-left-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* 懸停效果 */
+.hoverable {
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 可點擊元素 */
+.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.clickable:hover {
+  opacity: 0.8;
+}
+
+.clickable:active {
+  transform: scale(0.98);
+}
+
+/* 禁用狀態 */
+.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}

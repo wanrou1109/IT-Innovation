@@ -1,0 +1,444 @@
+.card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景變體 */
+.card.background-default {
+  background-color: var(--bg-secondary);
+}
+
+.card.background-primary {
+  background-color: var(--bg-primary);
+}
+
+.card.background-tertiary {
+  background-color: var(--bg-tertiary);
+}
+
+.card.background-gradient {
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+}
+
+/* 內邊距變體 */
+.card.padding-none {
+  padding: 0;
+}
+
+.card.padding-small {
+  padding: var(--space-md);
+}
+
+.card.padding-normal {
+  padding: var(--space-lg);
+}
+
+.card.padding-large {
+  padding: var(--space-xl);
+}
+
+/* 懸停效果 */
+.card.hoverable {
+  cursor: pointer;
+}
+
+.card.hoverable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border-color: var(--border-secondary);
+}
+
+.card.hoverable:active {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* 卡片陰影變體 */
+.card.shadow-none {
+  box-shadow: none;
+}
+
+.card.shadow-small {
+  box-shadow: var(--shadow-sm);
+}
+
+.card.shadow-medium {
+  box-shadow: var(--shadow-md);
+}
+
+.card.shadow-large {
+  box-shadow: var(--shadow-lg);
+}
+
+/* 卡片邊框變體 */
+.card.border-none {
+  border: none;
+}
+
+.card.border-primary {
+  border-color: var(--color-primary);
+}
+
+.card.border-success {
+  border-color: var(--color-success);
+}
+
+.card.border-warning {
+  border-color: var(--color-warning);
+}
+
+.card.border-error {
+  border-color: var(--color-error);
+}
+
+/* 卡片頭部 */
+.card-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.card-header:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.card-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: var(--space-xs) 0 0 0;
+}
+
+/* 卡片內容 */
+.card-content {
+  padding: var(--space-lg);
+}
+
+.card-content:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.card-content:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+/* 卡片底部 */
+.card-footer {
+  padding: var(--space-lg);
+  border-top: 1px solid var(--border-primary);
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-footer:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+/* 卡片動作區域 */
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.card-actions.justify-end {
+  justify-content: flex-end;
+}
+
+.card-actions.justify-center {
+  justify-content: center;
+}
+
+.card-actions.justify-between {
+  justify-content: space-between;
+}
+
+/* 卡片圖片 */
+.card-image {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.card-image:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.card-image:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.card-image-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-image-container:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.card-image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.7));
+  display: flex;
+  align-items: flex-end;
+  padding: var(--space-lg);
+  color: white;
+}
+
+/* 加載狀態 */
+.card.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.card.loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: shimmer 1.5s infinite;
+  z-index: 1;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* 卡片狀態 */
+.card.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.card.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* 卡片尺寸變體 */
+.card.size-small {
+  padding: var(--space-sm);
+}
+
+.card.size-medium {
+  padding: var(--space-md);
+}
+
+.card.size-large {
+  padding: var(--space-lg);
+}
+
+.card.size-extra-large {
+  padding: var(--space-xl);
+}
+
+/* 特殊卡片類型 */
+.card-stat {
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.card-stat-value {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.card-stat-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-stat-change {
+  font-size: var(--text-sm);
+  margin-top: var(--space-xs);
+}
+
+.card-stat-change.positive {
+  color: var(--color-success);
+}
+
+.card-stat-change.negative {
+  color: var(--color-error);
+}
+
+/* 媒體卡片 */
+.card-media {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-media-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-lg);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  color: white;
+}
+
+.card-media-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+}
+
+.card-media-description {
+  font-size: var(--text-sm);
+  opacity: 0.9;
+}
+
+/* 通知卡片 */
+.card-notification {
+  border-left: 4px solid;
+  padding: var(--space-md) var(--space-lg);
+}
+
+.card-notification.info {
+  border-left-color: var(--color-info);
+  background-color: rgba(6, 182, 212, 0.1);
+}
+
+.card-notification.success {
+  border-left-color: var(--color-success);
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.card-notification.warning {
+  border-left-color: var(--color-warning);
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.card-notification.error {
+  border-left-color: var(--color-error);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* 卡片網格 */
+.card-grid {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.card-grid.compact {
+  gap: var(--space-md);
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.card-grid.large {
+  gap: var(--space-xl);
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .card {
+    margin-bottom: var(--space-md);
+  }
+  
+  .card-header,
+  .card-content,
+  .card-footer {
+    padding: var(--space-md);
+  }
+  
+  .card.padding-large {
+    padding: var(--space-md);
+  }
+  
+  .card-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+  
+  .card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .card-actions.mobile-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+/* 深色模式優化 */
+@media (prefers-color-scheme: dark) {
+  .card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  }
+  
+  .card.hoverable:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* 可折疊卡片 */
+.card-collapsible .card-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.card-collapsible .card-header::after {
+  content: '▼';
+  float: right;
+  transition: transform var(--transition-fast);
+}
+
+.card-collapsible.collapsed .card-header::after {
+  transform: rotate(-90deg);
+}
+
+.card-collapsible.collapsed .card-content {
+  display: none;
+}
+
+/* 動畫進入效果 */
+.card.animate-in {
+  animation: cardSlideIn var(--transition-normal) ease-out;
+}
+
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
