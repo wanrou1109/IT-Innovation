@@ -8,33 +8,21 @@ export const APP_CONFIG = {
 
 // 網絡配置
 export const NETWORK_CONFIG = {
-  mainnet: {
-    chainId: 1,
-    name: 'Ethereum Mainnet',
-    rpcUrl: 'https://mainnet.infura.io/v3/',
-    blockExplorer: 'https://etherscan.io'
-  },
-  polygon: {
-    chainId: 137,
-    name: 'Polygon Mainnet',
-    rpcUrl: 'https://polygon-rpc.com',
-    blockExplorer: 'https://polygonscan.com'
-  },
-  testnet: {
-    chainId: 5,
-    name: 'Goerli Testnet',
-    rpcUrl: 'https://goerli.infura.io/v3/',
-    blockExplorer: 'https://goerli.etherscan.io'
+  CHAIN_ID: '0xaa36a7', // Sepolia: 11155111
+  CHAIN_NAME: 'Sepolia test network',
+  RPC_URL: 'https://ethereum-sepolia-rpc.publicnode.com',
+  BLOCK_EXPLORER_URL: 'https://sepolia.etherscan.io',
+  CURRENCY: {
+    name: 'Sepolia ETH',
+    symbol: 'ETH',
+    decimals: 18
   }
 };
 
-// 智能合約地址 (模擬地址)
+// 智能合約地址 (Sepolia 測試網)
 export const CONTRACT_ADDRESSES = {
-  FLT_TOKEN: '0x1234567890123456789012345678901234567890',
-  NFT_CONTRACT: '0x0987654321098765432109876543210987654321',
-  MARKETPLACE: '0x1111111111111111111111111111111111111111',
-  STAKING: '0x2222222222222222222222222222222222222222',
-  GOVERNANCE: '0x3333333333333333333333333333333333333333'
+  NFT_CONTRACT: '0x1dd853b859e67308803B9086D2Eb3f5c46CcFA95', // ConcertTicketNFT
+  VERIFICATION_REGISTRY: '0x177C3245afd85cD9b6a4372DcbdA583fE4EC57d4', // VerificationRegistry
 };
 
 // FLT 代幣配置
@@ -328,7 +316,23 @@ export const ANIMATION_CONFIG = {
   easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
 };
 
-export default {
+// 舉例定義（請依實際需求調整）
+export const REPORT_TYPES = {
+  BUG: {
+    label: 'Bug',
+    description: '功能錯誤或異常'
+  },
+  FEEDBACK: {
+    label: 'Feedback',
+    description: '一般意見回饋'
+  },
+  INAPPROPRIATE: {
+    label: 'Inappropriate',
+    description: '不當內容檢舉'
+  }
+};
+
+const defaultExport = {
   APP_CONFIG,
   NETWORK_CONFIG,
   CONTRACT_ADDRESSES,
@@ -348,3 +352,4 @@ export default {
   BREAKPOINTS,
   ANIMATION_CONFIG
 };
+export default defaultExport;

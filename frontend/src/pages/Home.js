@@ -1,195 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { useWallet } from '../hooks/useWallet.js';
-import Card from '../components/ui/Card.js';
+import { AlertTriangle, CheckCircle, ExternalLink, Flag, Loader, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import Button from '../components/ui/Button.js';
-import { X, Loader, CheckCircle, AlertTriangle, Flag, ExternalLink } from 'lucide-react';
+import Card from '../components/ui/Card.js';
+import { useWallet } from '../hooks/useWallet.js';
 import '../styles/pages/Home.css';
-
-const initialEvents = {
-    upcoming: [
-        {
-        id: 1,
-        title: 'ENHYPEN 2025 World Tour',
-        artist: 'ENHYPEN',
-        venue: 'Seoul Olympic Stadium, Seoul',
-        date: '2025-08-15',
-        time: '19:00',
-        image: '/api/placeholder/400/250',
-        price: { flt: 60, usd: 80 },
-        ticketTypes: [
-            { 
-            type: 'VIP', 
-            price: 120, 
-            available: 50, 
-            benefits: ['Meet & Greet', 'Premium Seating', 'Exclusive Merchandise', 'Early Entry'] 
-            },
-            { 
-            type: 'Premium', 
-            price: 80, 
-            available: 200, 
-            benefits: ['Great Seating', 'Priority Entry', 'Digital Program'] 
-            },
-            { 
-            type: 'General', 
-            price: 60, 
-            available: 500, 
-            benefits: ['Standard Seating', 'Digital Program'] 
-            }
-        ],
-        status: 'on_sale',
-        description: 'Experience the electrifying performance of ENHYPEN in their world tour.',
-        category: 'concert',
-        isPrimary: true,
-        totalTickets: 750,
-        soldTickets: 0
-        },
-        {
-        id: 2,
-        title: 'TWICE 2025 World Tour',
-        artist: 'TWICE',
-        venue: 'Tokyo Dome, Tokyo',
-        date: '2025-08-20',
-        time: '18:30',
-        image: '/api/placeholder/400/250',
-        price: { flt: 80, usd: 105 },
-        ticketTypes: [
-            { 
-            type: 'VIP', 
-            price: 150, 
-            available: 30, 
-            benefits: ['Orchestra Level', 'Champagne Reception', 'Signed Program'] 
-            },
-            { 
-            type: 'Premium', 
-            price: 100, 
-            available: 150, 
-            benefits: ['Mezzanine Seating', 'Intermission Refreshments'] 
-            },
-            { 
-            type: 'General', 
-            price: 80, 
-            available: 300, 
-            benefits: ['Balcony Seating', 'Digital Program'] 
-            }
-        ],
-        status: 'on_sale',
-        description: 'A magical evening with TWICE!',
-        category: 'concert',
-        isPrimary: true,
-        totalTickets: 480,
-        soldTickets: 0
-        },
-        {
-        id: 3,
-        title: 'BOYNEXTDOOR 2025 World Tour',
-        artist: 'BOYNEXTDOOR',
-        venue: 'Staples Center, Los Angeles',
-        date: '2025-08-25',
-        time: '20:00',
-        image: '/api/placeholder/400/250',
-        price: { flt: 75, usd: 95 },
-        ticketTypes: [
-            { 
-            type: 'VIP', 
-            price: 140, 
-            available: 20, 
-            benefits: ['Front Row Access', 'Artist Meet & Greet', 'Exclusive Merchandise'] 
-            },
-            { 
-            type: 'Premium', 
-            price: 90, 
-            available: 100, 
-            benefits: ['Premium Seating', 'Fast Track Entry'] 
-            },
-            { 
-            type: 'General', 
-            price: 75, 
-            available: 200, 
-            benefits: ['General Admission', 'Standing Area'] 
-            }
-        ],
-        status: 'on_sale',
-        description: 'Join BND for an unforgettable night of music.',
-        category: 'concert',
-        isPrimary: false,
-        totalTickets: 320,
-        soldTickets: 0
-        }
-    ],
-    past: []
-};
+import {
+    buyResaleTicketFromContract,
+    getAllConcerts,
+    getResaleOrders,
+    purchaseTicketFromContract
+} from '../utils/web3Utils.js';
 
 const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) => {
-    const { purchaseTicket, walletInfo, isConnected } = useWallet();
-    const [events, setEvents] = useState(initialEvents);
+    const { walletInfo, isConnected } = useWallet();
+    const [events, setEvents] = useState({ upcoming: [], past: [] });
     const [resaleTickets, setResaleTickets] = useState([]);
     const [purchaseModal, setPurchaseModal] = useState({ show: false, event: null });
     const [purchasing, setPurchasing] = useState(false);
     const [purchaseResult, setPurchaseResult] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // 載入演唱會資料
+    useEffect(() => {
+        loadConcerts();
+    }, []);
 
     // 載入轉售票券
     useEffect(() => {
         if (homeMarketType === 'secondary') {
-        loadResaleTickets();
+            loadResaleTickets();
         }
     }, [homeMarketType]);
 
-    const loadResaleTickets = () => {
+    const loadConcerts = async () => {
         try {
-        const savedResaleTickets = JSON.parse(localStorage.getItem('resaleTickets') || '[]');
-        // 添加賣家信息到每個轉售票券
-        const ticketsWithSellerInfo = savedResaleTickets.map(ticket => ({
-            ...ticket,
-            seller: ticket.seller || generateSellerInfo(ticket.resaleId)
-        }));
-        const availableTickets = ticketsWithSellerInfo.filter(ticket => ticket.isAvailable);
-        setResaleTickets(availableTickets);
+            setLoading(true);
+            setError(null);
+            const concerts = await getAllConcerts();
+            
+            // 根據日期分類為即將到來和過去的演唱會
+            const now = new Date();
+            const upcoming = concerts.filter(concert => new Date(concert.date) >= now);
+            const past = concerts.filter(concert => new Date(concert.date) < now);
+            
+            setEvents({ upcoming, past });
         } catch (error) {
-        console.error('Error loading resale tickets:', error);
-        setResaleTickets([]);
+            console.error('Error loading concerts:', error);
+            setError('Failed to load concerts from blockchain');
+            // 如果合約讀取失敗，使用空陣列
+            setEvents({ upcoming: [], past: [] });
+        } finally {
+            setLoading(false);
         }
     };
 
-    // 生成賣家信息（模擬數據）
-    const generateSellerInfo = (resaleId) => {
-        const sellerNames = ['KpopFan2024', 'ConcertCollector', 'TicketTrader88', 'SeoulMusicLover', 'TokyoConcertGoer'];
-        const addresses = [
-        '0x742d35Cc6C907C38d39F65d46F8B1234567890Ab',
-        '0x1a2b3c4d5e6f7890123456789abcdef01234567',
-        '0x9876543210987654321098765432109876543210',
-        '0xabcdef1234567890abcdef1234567890abcdef12',
-        '0x5566778899aabbccddeeff1122334455667788aa'
-        ];
-        const verificationLevels = ['Gold', 'Silver', 'Bronze'];
-        
-        const index = parseInt(resaleId) % sellerNames.length;
-        
-        return {
-        name: sellerNames[index],
-        address: addresses[index],
-        verificationLevel: verificationLevels[index % 3],
-        salesCount: Math.floor(Math.random() * 25) + 1,
-        rating: (Math.random() * 1.5 + 3.5).toFixed(1), // 3.5 - 5.0
-        joinDate: '2023-06-15',
-        successRate: Math.floor(Math.random() * 20) + 80 // 80-100%
-        };
+    const loadResaleTickets = async () => {
+        try {
+            setLoading(true);
+            const tickets = await getResaleOrders(50, 0);
+            setResaleTickets(tickets);
+        } catch (error) {
+            console.error('Error loading resale tickets:', error);
+            setResaleTickets([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // 處理 Report 按鈕點擊
     const handleReportSeller = (seller, eventTitle, ticketInfo) => {
         if (!setReportTarget || !setCurrentPage) {
-        console.warn('Report functionality not available - missing required props');
-        return;
+            console.warn('Report functionality not available - missing required props');
+            return;
         }
 
         // 設置預填的 report 資料
         setReportTarget({
-        accountName: seller.name,
-        accountAddress: seller.address,
-        reportType: 'scalping',
-        subject: `Suspicious pricing for ${eventTitle} - ${ticketInfo.type} ticket`,
-        detail: `Seller ${seller.name} is selling ${ticketInfo.type} tickets for ${eventTitle} at ${ticketInfo.resalePrice} FLT (original price: ${ticketInfo.originalPrice} FLT). This represents a ${(((ticketInfo.resalePrice - ticketInfo.originalPrice) / ticketInfo.originalPrice) * 100).toFixed(1)}% markup.`,
-        context: 'Reported from secondary market listing'
+            accountName: seller.name,
+            accountAddress: seller.address,
+            reportType: 'scalping',
+            subject: `Suspicious pricing for ${eventTitle} - ${ticketInfo.type} ticket`,
+            detail: `Seller ${seller.name} is selling ${ticketInfo.type} tickets for ${eventTitle} at ${ticketInfo.resalePrice} FLT (original price: ${ticketInfo.originalPrice} FLT). This represents a ${(((ticketInfo.resalePrice - ticketInfo.originalPrice) / ticketInfo.originalPrice) * 100).toFixed(1)}% markup.`,
+            context: 'Reported from secondary market listing'
         });
         
         // 跳轉到 report 頁面的 submit tab
@@ -204,10 +97,10 @@ const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) =
     // 獲取驗證等級顏色
     const getVerificationColor = (level) => {
         switch (level) {
-        case 'Gold': return '#FFD700';
-        case 'Silver': return '#C0C0C0';
-        case 'Bronze': return '#CD7F32';
-        default: return '#6B7280';
+            case 'Gold': return '#FFD700';
+            case 'Silver': return '#C0C0C0';
+            case 'Bronze': return '#CD7F32';
+            default: return '#6B7280';
         }
     };
 
@@ -219,32 +112,32 @@ const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) =
     // 處理購票點擊
     const handlePurchaseClick = (item) => {
         if (!isConnected) {
-        alert('Please connect your wallet first');
-        return;
+            alert('Please connect your wallet first');
+            return;
         }
         
         // 如果是轉售票券，轉換格式以適配現有的購票流程
         if (homeMarketType === 'secondary' && item.resaleId) {
-        const convertedEvent = {
-            id: item.id,
-            title: item.event,
-            artist: item.artist,
-            venue: item.venue,
-            date: item.date,
-            time: item.time,
-            image: item.image,
-            price: { flt: item.resalePrice },
-            ticketTypes: [{
-            type: item.type,
-            price: item.resalePrice,
-            available: 1
-            }],
-            isResale: true,
-            originalTicket: item
-        };
-        setPurchaseModal({ show: true, event: convertedEvent });
+            const convertedEvent = {
+                id: item.id,
+                title: item.event,
+                artist: item.artist,
+                venue: item.venue,
+                date: item.date,
+                time: item.time,
+                image: item.image,
+                price: { flt: item.resalePrice },
+                ticketTypes: [{
+                    type: item.type,
+                    price: item.resalePrice,
+                    available: 1
+                }],
+                isResale: true,
+                originalTicket: item
+            };
+            setPurchaseModal({ show: true, event: convertedEvent });
         } else {
-        setPurchaseModal({ show: true, event: item });
+            setPurchaseModal({ show: true, event: item });
         }
         setPurchaseResult(null);
     };
@@ -255,227 +148,227 @@ const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) =
         setPurchaseResult(null);
         
         try {
-        const result = await purchaseTicket(purchaseModal.event.id, ticketType, price);
-        
-        if (result.success) {
-            // 添加票券到 localStorage
-            const existingTickets = JSON.parse(localStorage.getItem('userTickets') || '[]');
-            const newTicket = {
-            id: result.ticketId,
-            event: purchaseModal.event.title,
-            artist: purchaseModal.event.artist,
-            venue: purchaseModal.event.venue,
-            date: purchaseModal.event.date,
-            time: purchaseModal.event.time,
-            type: ticketType,
-            price: price,
-            qrCode: `QR${result.ticketId}`,
-            image: purchaseModal.event.image,
-            resellable: true,
-            purchaseTime: new Date().toISOString(),
-            transactionHash: result.transactionHash,
-            blockNumber: result.blockNumber,
-            gasUsed: result.gasUsed,
-            status: 'confirmed'
-            };
+            let result;
             
-            existingTickets.push(newTicket);
-            localStorage.setItem('userTickets', JSON.stringify(existingTickets));
-
-            // 如果是轉售票券，從轉售列表中移除
             if (purchaseModal.event.isResale) {
-            const updatedResaleTickets = JSON.parse(localStorage.getItem('resaleTickets') || '[]');
-            const filteredTickets = updatedResaleTickets.map(ticket => 
-                ticket.resaleId === purchaseModal.event.originalTicket.resaleId 
-                ? { ...ticket, isAvailable: false, soldTo: walletInfo.address, soldDate: new Date().toISOString() }
-                : ticket
-            );
-            localStorage.setItem('resaleTickets', JSON.stringify(filteredTickets));
-            loadResaleTickets(); // 重新載入轉售票券列表
+                // 購買轉售票券
+                const orderId = purchaseModal.event.originalTicket.orderId;
+                result = await buyResaleTicketFromContract(orderId, price);
             } else {
-            // 更新活動的售出票數
-            setEvents(prev => ({
-                ...prev,
-                upcoming: prev.upcoming.map(event => 
-                event.id === purchaseModal.event.id 
-                    ? { 
-                        ...event, 
-                        soldTickets: event.soldTickets + 1,
-                        ticketTypes: event.ticketTypes.map(t => 
-                        t.type === ticketType 
-                            ? { ...t, available: t.available - 1 }
-                            : t
-                        )
-                    }
-                    : event
-                )
-            }));
+                // 購買原價票券
+                const seatNumber = Math.floor(Math.random() * 100) + 1; // 隨機座位號
+                const seatSection = 'A'; // 預設區域
+                result = await purchaseTicketFromContract(
+                    purchaseModal.event.id, 
+                    seatNumber, 
+                    seatSection, 
+                    price
+                );
             }
             
-            setPurchaseResult({
-            success: true,
-            message: `Successfully purchased ${ticketType} ticket for ${price} FLT!`,
-            ticketId: result.ticketId,
-            transactionHash: result.transactionHash
-            });
-            
-            // 3秒後自動關閉模態框
-            setTimeout(() => {
-            setPurchaseModal({ show: false, event: null });
-            setPurchaseResult(null);
-            }, 3000);
-        }
+            if (result.success) {
+                setPurchaseResult({
+                    success: true,
+                    message: `Successfully purchased ${ticketType} ticket for ${price} FLT!`,
+                    ticketId: result.ticketId,
+                    transactionHash: result.transactionHash
+                });
+                
+                // 重新載入資料
+                if (purchaseModal.event.isResale) {
+                    loadResaleTickets();
+                } else {
+                    loadConcerts();
+                }
+            } else {
+                setPurchaseResult({
+                    success: false,
+                    message: result.error || 'Purchase failed. Please try again.'
+                });
+            }
         } catch (error) {
-        setPurchaseResult({
-            success: false,
-            message: `Purchase failed: ${error.message}`,
-            error: error.message
-        });
+            console.error('Purchase error:', error);
+            setPurchaseResult({
+                success: false,
+                message: 'Transaction failed. Please check your wallet and try again.'
+            });
         } finally {
-        setPurchasing(false);
+            setPurchasing(false);
         }
     };
+
+    // 關閉購票彈窗
+    const handleCloseModal = () => {
+        setPurchaseModal({ show: false, event: null });
+        setPurchaseResult(null);
+    };
+
+    // 如果正在載入
+    if (loading) {
+        return (
+            <div className="home-container">
+                <div className="loading-container">
+                    <Loader className="loading-spinner" size={48} />
+                    <p>Loading {homeMarketType === 'primary' ? 'concerts' : 'resale tickets'} from blockchain...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // 如果有錯誤
+    if (error) {
+        return (
+            <div className="home-container">
+                <div className="error-container">
+                    <AlertTriangle size={48} color="#EF4444" />
+                    <h3>Error Loading Data</h3>
+                    <p>{error}</p>
+                    <Button onClick={homeMarketType === 'primary' ? loadConcerts : loadResaleTickets}>
+                        Retry
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="home">
-        {/* Hero Section */}
-        <section className="hero-section">
-            <div className="hero-content">
-            <h1>
-                {homeMarketType === 'primary' ? 'Official Primary Sales' : 'Fan-to-Fan Secondary Market'}
-            </h1>
-            <p>
-                {homeMarketType === 'primary' 
-                ? 'Buy tickets directly from official sources at face value with guaranteed authenticity'
-                : 'Buy and sell tickets from other fans in a secure, verified marketplace'
-                }
-            </p>
-            </div>
-        </section>
-
-        {/* Events Section */}
-        <section className="events-section" data-market-type={homeMarketType}>
-            <h2>
-            {homeMarketType === 'primary' ? 'Available Official Sales' : 'Fan Marketplace Listings'}
-            </h2>
-            
-            {filteredEvents.length > 0 ? (
-            <div className="events-grid">
-                {filteredEvents.map((item) => (
-                homeMarketType === 'primary' ? (
-                    <EventCard 
-                    key={item.id} 
-                    event={item} 
-                    marketType={homeMarketType}
-                    onPurchaseClick={handlePurchaseClick}
-                    />
-                ) : (
-                    <ResaleTicketCard
-                    key={item.resaleId}
-                    ticket={item}
-                    onPurchaseClick={handlePurchaseClick}
-                    onReportSeller={handleReportSeller}
-                    formatAddress={formatAddress}
-                    getVerificationColor={getVerificationColor}
-                    />
-                )
-                ))}
-            </div>
-            ) : (
-            <div className="empty-state">
-                <div className="empty-icon">🎫</div>
-                <h3>No events available</h3>
-                <p>
-                {homeMarketType === 'primary' 
-                    ? 'No official sales are currently available. Check back soon for new releases!' 
-                    : 'No fan-to-fan tickets are currently available in the marketplace.'
-                }
+        <div className="home-container">
+            {/* Market Type Toggle */}
+            <div className="market-toggle">
+                <h1>
+                    {homeMarketType === 'primary' ? 'Official Concert Sales' : 'Fan-to-Fan Marketplace'}
+                </h1>
+                <p className="market-description">
+                    {homeMarketType === 'primary' 
+                        ? 'Purchase official tickets directly from organizers with blockchain verification'
+                        : 'Buy and sell tickets safely in our community marketplace'
+                    }
                 </p>
             </div>
-            )}
-        </section>
 
-        {/* Purchase Modal */}
-        {purchaseModal.show && (
-            <PurchaseModal 
-            event={purchaseModal.event}
-            onClose={() => {
-                setPurchaseModal({ show: false, event: null });
-                setPurchaseResult(null);
-            }}
-            onConfirm={handleConfirmPurchase}
-            purchasing={purchasing}
-            userBalance={walletInfo.fltBalance}
-            purchaseResult={purchaseResult}
-            />
-        )}
+            {/* Events Section */}
+            <section className="events-section" data-market-type={homeMarketType}>
+                <h2>
+                    {homeMarketType === 'primary' ? 'Available Official Sales' : 'Fan Marketplace Listings'}
+                </h2>
+                
+                {filteredEvents.length > 0 ? (
+                    <div className="events-grid">
+                        {filteredEvents.map((item) => (
+                            homeMarketType === 'primary' ? (
+                                <EventCard 
+                                    key={item.id} 
+                                    event={item} 
+                                    marketType={homeMarketType}
+                                    onPurchaseClick={handlePurchaseClick}
+                                />
+                            ) : (
+                                <ResaleTicketCard
+                                    key={item.resaleId}
+                                    ticket={item}
+                                    onPurchaseClick={handlePurchaseClick}
+                                    onReportSeller={handleReportSeller}
+                                    formatAddress={formatAddress}
+                                    getVerificationColor={getVerificationColor}
+                                />
+                            )
+                        ))}
+                    </div>
+                ) : (
+                    <div className="empty-state">
+                        <div className="empty-icon">🎫</div>
+                        <h3>No events available</h3>
+                        <p>
+                            {homeMarketType === 'primary' 
+                                ? 'No official sales are currently available on the blockchain. Check back soon for new releases!' 
+                                : 'No fan-to-fan tickets are currently available in the marketplace.'
+                            }
+                        </p>
+                        <Button onClick={homeMarketType === 'primary' ? loadConcerts : loadResaleTickets}>
+                            Refresh
+                        </Button>
+                    </div>
+                )}
+            </section>
+
+            {/* Purchase Modal */}
+            {purchaseModal.show && (
+                <PurchaseModal
+                    event={purchaseModal.event}
+                    onClose={handleCloseModal}
+                    onConfirm={handleConfirmPurchase}
+                    purchasing={purchasing}
+                    userBalance={walletInfo?.balance || 0}
+                    purchaseResult={purchaseResult}
+                />
+            )}
         </div>
     );
-    };
+};
 
-    // Event Card Component (unchanged)
-    const EventCard = ({ event, marketType, onPurchaseClick }) => {
+// Event Card Component (unchanged)
+const EventCard = ({ event, marketType, onPurchaseClick }) => {
     const [imageError, setImageError] = useState(false);
 
     return (
         <Card className="event-card" hoverable>
-        <div className="event-image-container">
-            {!imageError ? (
-            <img
-                src={event.image}
-                alt={event.title}
-                className="event-image"
-                onError={() => setImageError(true)}
-            />
-            ) : (
-            <div className="event-placeholder">
-                <div className="placeholder-icon">🎵</div>
+            <div className="event-image-container">
+                {!imageError ? (
+                    <img
+                        src={event.image}
+                        alt={event.title}
+                        className="event-image"
+                        onError={() => setImageError(true)}
+                    />
+                ) : (
+                    <div className="event-placeholder">
+                        <div className="placeholder-icon">🎵</div>
+                    </div>
+                )}
+                
+                <div className={`market-badge ${marketType}`}>
+                    {marketType === 'primary' ? 'Official' : 'Resale'}
+                </div>
             </div>
-            )}
             
-            <div className={`market-badge ${marketType}`}>
-            {marketType === 'primary' ? 'Official' : 'Resale'}
+            <div className="event-info">
+                <h3 className="event-title">{event.title}</h3>
+                <p className="event-artist">{event.artist}</p>
+                <p className="event-venue">{event.venue}</p>
+                <div className="event-details">
+                    <span className="event-date">{event.date} • {event.time}</span>
+                    <span className="event-tickets">
+                        {event.totalTickets - event.soldTickets} tickets available
+                    </span>
+                </div>
+                <div className="event-footer">
+                    <div className="price-info">
+                        <span className="price-from">From {event.price.flt} FLT</span>
+                        <span className="price-usd">(${event.price.usd})</span>
+                    </div>
+                    <Button 
+                        variant="primary" 
+                        size="small"
+                        onClick={() => onPurchaseClick(event)}
+                    >
+                        {marketType === 'primary' ? 'Buy Now' : 'View Offers'}
+                    </Button>
+                </div>
             </div>
-        </div>
-        
-        <div className="event-info">
-            <h3 className="event-title">{event.title}</h3>
-            <p className="event-artist">{event.artist}</p>
-            <p className="event-venue">{event.venue}</p>
-            <div className="event-details">
-            <span className="event-date">{event.date} • {event.time}</span>
-            <span className="event-tickets">
-                {event.totalTickets - event.soldTickets} tickets available
-            </span>
-            </div>
-            <div className="event-footer">
-            <div className="price-info">
-                <span className="price-from">From {event.price.flt} FLT</span>
-                <span className="price-usd">(${event.price.usd})</span>
-            </div>
-            <Button 
-                variant="primary" 
-                size="small"
-                onClick={() => onPurchaseClick(event)}
-            >
-                {marketType === 'primary' ? 'Buy Now' : 'View Offers'}
-            </Button>
-            </div>
-        </div>
         </Card>
     );
-    };
+};
 
-    // Enhanced Resale Ticket Card Component with Seller Info
-    const ResaleTicketCard = ({ ticket, onPurchaseClick, onReportSeller, formatAddress, getVerificationColor }) => {
+// Enhanced Resale Ticket Card Component with Seller Info
+const ResaleTicketCard = ({ ticket, onPurchaseClick, onReportSeller, formatAddress, getVerificationColor }) => {
     const [imageError, setImageError] = useState(false);
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
         });
     };
 
@@ -489,161 +382,161 @@ const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) =
 
     return (
         <Card className="event-card resale-ticket-card" hoverable>
-        <div className="event-image-container">
-            {!imageError ? (
-            <img
-                src={ticket.image}
-                alt={ticket.event}
-                className="event-image"
-                onError={() => setImageError(true)}
-            />
-            ) : (
-            <div className="event-placeholder">
-                <div className="placeholder-icon">🎵</div>
+            <div className="event-image-container">
+                {!imageError ? (
+                    <img
+                        src={ticket.image}
+                        alt={ticket.event}
+                        className="event-image"
+                        onError={() => setImageError(true)}
+                    />
+                ) : (
+                    <div className="event-placeholder">
+                        <div className="placeholder-icon">🎵</div>
+                    </div>
+                )}
+                
+                <div className="market-badge secondary">Resale</div>
+                
+                {discount > 0 && (
+                    <div className="discount-badge">
+                        {discount.toFixed(0)}% OFF
+                    </div>
+                )}
+                
+                {isPriceIncreased && (
+                    <div className="price-increase-badge">
+                        +{Math.abs(discount).toFixed(0)}%
+                    </div>
+                )}
+                
+                <div className="ticket-type-badge">
+                    {ticket.type}
+                </div>
             </div>
-            )}
             
-            <div className="market-badge secondary">Resale</div>
-            
-            {discount > 0 && (
-            <div className="discount-badge">
-                {discount.toFixed(0)}% OFF
-            </div>
-            )}
-            
-            {isPriceIncreased && (
-            <div className="price-increase-badge">
-                +{Math.abs(discount).toFixed(0)}%
-            </div>
-            )}
-            
-            <div className="ticket-type-badge">
-            {ticket.type}
-            </div>
-        </div>
-        
-        <div className="event-info">
-            <h3 className="event-title">{ticket.event}</h3>
-            <p className="event-artist">{ticket.artist}</p>
-            <p className="event-venue">{ticket.venue}</p>
-            
-            <div className="event-details">
-            <span className="event-date">{formatDate(ticket.date)} • {ticket.time}</span>
-            </div>
+            <div className="event-info">
+                <h3 className="event-title">{ticket.event}</h3>
+                <p className="event-artist">{ticket.artist}</p>
+                <p className="event-venue">{ticket.venue}</p>
+                
+                <div className="event-details">
+                    <span className="event-date">{formatDate(ticket.date)} • {ticket.time}</span>
+                </div>
 
-            {/* Seller Information */}
-            {ticket.seller && (
-            <div className="seller-info">
-                <div className="seller-header">
-                <h4>Seller Information</h4>
+                {/* Seller Information */}
+                {ticket.seller && (
+                    <div className="seller-info">
+                        <div className="seller-header">
+                            <h4>Seller Information</h4>
+                        </div>
+                        
+                        <div className="seller-details">
+                            <div className="seller-name-verification">
+                                <span className="seller-name">{ticket.seller.name}</span>
+                                <span 
+                                    className="verification-badge"
+                                    style={{ color: getVerificationColor(ticket.seller.verificationLevel) }}
+                                >
+                                    {ticket.seller.verificationLevel}
+                                </span>
+                            </div>
+                            
+                            <div className="seller-address">
+                                <span className="address-label">Address:</span>
+                                <span className="address-value">
+                                    {formatAddress(ticket.seller.address)}
+                                </span>
+                                <button 
+                                    className="address-link"
+                                    onClick={() => window.open(`https://etherscan.io/address/${ticket.seller.address}`, '_blank')}
+                                    title="View on Etherscan"
+                                >
+                                    <ExternalLink size={12} />
+                                </button>
+                            </div>
+                            
+                            <div className="seller-stats">
+                                <span className="stat">
+                                    {ticket.seller.salesCount} sales
+                                </span>
+                                <span className="stat">
+                                    ⭐ {ticket.seller.rating}
+                                </span>
+                                <span className="stat">
+                                    {ticket.seller.successRate}% success
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="seller-actions">
+                            <Button
+                                variant="outline"
+                                size="small"
+                                icon={<Flag size={14} />}
+                                onClick={() => onReportSeller(ticket.seller, ticket.event, {
+                                    type: ticket.type,
+                                    resalePrice: ticket.resalePrice,
+                                    originalPrice: ticket.originalPrice
+                                })}
+                                className="report-button"
+                            >
+                                Report
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="resale-info">
+                    <div className="price-comparison">
+                        <div className="original-price">
+                            Original: {ticket.originalPrice} FLT
+                        </div>
+                        <div className="resale-price">
+                            Resale: {ticket.resalePrice} FLT
+                        </div>
+                    </div>
+                    
+                    {ticket.resaleReason && (
+                        <div className="resale-reason">
+                            <small>"{ticket.resaleReason}"</small>
+                        </div>
+                    )}
                 </div>
                 
-                <div className="seller-details">
-                <div className="seller-name-verification">
-                    <span className="seller-name">{ticket.seller.name}</span>
-                    <span 
-                    className="verification-badge"
-                    style={{ color: getVerificationColor(ticket.seller.verificationLevel) }}
+                <div className="event-footer">
+                    <div className="price-info">
+                        <span className="price-from">{ticket.resalePrice} FLT</span>
+                        <span className="price-comparison-text">
+                            {discount > 0 ? `${discount.toFixed(0)}% below original` : 
+                            discount < 0 ? `${Math.abs(discount).toFixed(0)}% above original` : 
+                            'Same as original'}
+                        </span>
+                    </div>
+                    <Button 
+                        variant="primary" 
+                        size="small"
+                        onClick={() => onPurchaseClick(ticket)}
                     >
-                    {ticket.seller.verificationLevel}
-                    </span>
-                </div>
-                
-                <div className="seller-address">
-                    <span className="address-label">Address:</span>
-                    <span className="address-value">
-                    {formatAddress(ticket.seller.address)}
-                    </span>
-                    <button 
-                    className="address-link"
-                    onClick={() => window.open(`https://etherscan.io/address/${ticket.seller.address}`, '_blank')}
-                    title="View on Etherscan"
-                    >
-                    <ExternalLink size={12} />
-                    </button>
-                </div>
-                
-                <div className="seller-stats">
-                    <span className="stat">
-                    {ticket.seller.salesCount} sales
-                    </span>
-                    <span className="stat">
-                    ⭐ {ticket.seller.rating}
-                    </span>
-                    <span className="stat">
-                    {ticket.seller.successRate}% success
-                    </span>
-                </div>
-                </div>
-
-                <div className="seller-actions">
-                <Button
-                    variant="outline"
-                    size="small"
-                    icon={<Flag size={14} />}
-                    onClick={() => onReportSeller(ticket.seller, ticket.event, {
-                    type: ticket.type,
-                    resalePrice: ticket.resalePrice,
-                    originalPrice: ticket.originalPrice
-                    })}
-                    className="report-button"
-                >
-                    Report
-                </Button>
+                        Buy Resale Ticket
+                    </Button>
                 </div>
             </div>
-            )}
-
-            <div className="resale-info">
-            <div className="price-comparison">
-                <div className="original-price">
-                Original: {ticket.originalPrice} FLT
-                </div>
-                <div className="resale-price">
-                Resale: {ticket.resalePrice} FLT
-                </div>
-            </div>
-            
-            {ticket.resaleReason && (
-                <div className="resale-reason">
-                <small>"{ticket.resaleReason}"</small>
-                </div>
-            )}
-            </div>
-            
-            <div className="event-footer">
-            <div className="price-info">
-                <span className="price-from">{ticket.resalePrice} FLT</span>
-                <span className="price-comparison-text">
-                {discount > 0 ? `${discount.toFixed(0)}% below original` : 
-                discount < 0 ? `${Math.abs(discount).toFixed(0)}% above original` : 
-                'Same as original'}
-                </span>
-            </div>
-            <Button 
-                variant="primary" 
-                size="small"
-                onClick={() => onPurchaseClick(ticket)}
-            >
-                Buy Resale Ticket
-            </Button>
-            </div>
-        </div>
         </Card>
     );
-    };
+};
 
-    // Purchase Modal Component (unchanged)
-    const PurchaseModal = ({ event, onClose, onConfirm, purchasing, userBalance, purchaseResult }) => {
+// Purchase Modal Component (unchanged)
+const PurchaseModal = ({ event, onClose, onConfirm, purchasing, userBalance, purchaseResult }) => {
     const [selectedTicket, setSelectedTicket] = useState(null);
 
     useEffect(() => {
         // 自動選擇第一個可用的票券類型
         if (event.ticketTypes && event.ticketTypes.length > 0) {
-        const availableTicket = event.ticketTypes.find(t => t.available > 0);
-        if (availableTicket) {
-            setSelectedTicket(availableTicket);
-        }
+            const availableTicket = event.ticketTypes.find(t => t.available > 0);
+            if (availableTicket) {
+                setSelectedTicket(availableTicket);
+            }
         }
     }, [event]);
 
@@ -654,135 +547,135 @@ const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) =
 
     return (
         <div className="modal-overlay">
-        <div className="modal-content">
-            <div className="modal-header">
-            <h2>Purchase Ticket</h2>
-            <button onClick={onClose} className="close-button">
-                <X size={24} />
-            </button>
-            </div>
-
-            {/* Event Info */}
-            <div className="event-summary">
-            <h3>{event.title}</h3>
-            <p className="event-details">{event.artist}</p>
-            <p className="event-details">{event.venue} • {event.date} • {event.time}</p>
-            </div>
-
-            {/* Balance Info */}
-            <div className="balance-info">
-            <p>Your FLT Balance: <strong>{userBalance.toLocaleString()} FLT</strong></p>
-            </div>
-
-            {/* Purchase Result */}
-            {purchaseResult && (
-            <div className={`purchase-result ${purchaseResult.success ? 'success' : 'error'}`}>
-                <div className="result-icon">
-                {purchaseResult.success ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
+            <div className="modal-content">
+                <div className="modal-header">
+                    <h2>Purchase Ticket</h2>
+                    <button onClick={onClose} className="close-button">
+                        <X size={24} />
+                    </button>
                 </div>
-                <div className="result-content">
-                <p className="result-message">{purchaseResult.message}</p>
-                {purchaseResult.success && purchaseResult.transactionHash && (
-                    <p className="transaction-hash">
-                    Transaction: {purchaseResult.transactionHash.slice(0, 10)}...
-                    </p>
-                )}
-                </div>
-            </div>
-            )}
 
-            {/* Ticket Selection */}
-            {!purchaseResult && (
-            <>
-                <div className="ticket-selection">
-                <h4>Select Ticket Type:</h4>
-                {event.ticketTypes?.map((ticket, index) => (
-                    <div 
-                    key={index}
-                    onClick={() => ticket.available > 0 && setSelectedTicket(ticket)}
-                    className={`ticket-option ${selectedTicket?.type === ticket.type ? 'selected' : ''} ${ticket.available === 0 ? 'sold-out' : ''}`}
-                    >
-                    <div className="ticket-info">
-                        <div className="ticket-type">
-                        <strong>{ticket.type}</strong>
-                        <p className="ticket-benefits">
-                            {ticket.benefits?.slice(0, 2).join(' • ')}
-                            {ticket.benefits?.length > 2 && '...'}
-                        </p>
+                {/* Event Info */}
+                <div className="event-summary">
+                    <h3>{event.title}</h3>
+                    <p className="event-details">{event.artist}</p>
+                    <p className="event-details">{event.venue} • {event.date} • {event.time}</p>
+                </div>
+
+                {/* Balance Info */}
+                <div className="balance-info">
+                    <p>Your FLT Balance: <strong>{userBalance.toLocaleString()} FLT</strong></p>
+                </div>
+
+                {/* Purchase Result */}
+                {purchaseResult && (
+                    <div className={`purchase-result ${purchaseResult.success ? 'success' : 'error'}`}>
+                        <div className="result-icon">
+                            {purchaseResult.success ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
                         </div>
-                        <div className="ticket-availability">
-                        <span className={`availability ${ticket.available === 0 ? 'sold-out' : ''}`}>
-                            {ticket.available === 0 ? 'Sold Out' : `${ticket.available} available`}
-                        </span>
+                        <div className="result-content">
+                            <p className="result-message">{purchaseResult.message}</p>
+                            {purchaseResult.success && purchaseResult.transactionHash && (
+                                <p className="transaction-hash">
+                                    Transaction: {purchaseResult.transactionHash.slice(0, 10)}...
+                                </p>
+                            )}
                         </div>
                     </div>
-                    <div className="ticket-price">
-                        <div className="price">{ticket.price} FLT</div>
-                        {userBalance < ticket.price && ticket.available > 0 && (
-                        <div className="insufficient-balance">Insufficient balance</div>
+                )}
+
+                {/* Ticket Selection */}
+                {!purchaseResult && (
+                    <>
+                        <div className="ticket-selection">
+                            <h4>Select Ticket Type:</h4>
+                            {event.ticketTypes?.map((ticket, index) => (
+                                <div 
+                                    key={index}
+                                    onClick={() => ticket.available > 0 && setSelectedTicket(ticket)}
+                                    className={`ticket-option ${selectedTicket?.type === ticket.type ? 'selected' : ''} ${ticket.available === 0 ? 'sold-out' : ''}`}
+                                >
+                                    <div className="ticket-info">
+                                        <div className="ticket-type">
+                                            <strong>{ticket.type}</strong>
+                                            <p className="ticket-benefits">
+                                                {ticket.benefits?.slice(0, 2).join(' • ')}
+                                                {ticket.benefits?.length > 2 && '...'}
+                                            </p>
+                                        </div>
+                                        <div className="ticket-availability">
+                                            <span className={`availability ${ticket.available === 0 ? 'sold-out' : ''}`}>
+                                                {ticket.available === 0 ? 'Sold Out' : `${ticket.available} available`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="ticket-price">
+                                        <div className="price">{ticket.price} FLT</div>
+                                        {userBalance < ticket.price && ticket.available > 0 && (
+                                            <div className="insufficient-balance">Insufficient balance</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )) || (
+                                <div className="ticket-option selected">
+                                    <div className="ticket-info">
+                                        <strong>General</strong>
+                                    </div>
+                                    <div className="ticket-price">
+                                        <div className="price">{event.price.flt} FLT</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Selected Ticket Summary */}
+                        {selectedTicket && (
+                            <div className="purchase-summary">
+                                <h4>Purchase Summary</h4>
+                                <div className="summary-item">
+                                    <span>Ticket Type:</span>
+                                    <span>{selectedTicket.type}</span>
+                                </div>
+                                <div className="summary-item">
+                                    <span>Price:</span>
+                                    <span>{selectedTicket.price} FLT</span>
+                                </div>
+                                <div className="summary-item total">
+                                    <span>Total:</span>
+                                    <span>{selectedTicket.price} FLT</span>
+                                </div>
+                            </div>
                         )}
-                    </div>
-                    </div>
-                )) || (
-                    <div className="ticket-option selected">
-                    <div className="ticket-info">
-                        <strong>General</strong>
-                    </div>
-                    <div className="ticket-price">
-                        <div className="price">{event.price.flt} FLT</div>
-                    </div>
-                    </div>
+                    </>
                 )}
-                </div>
 
-                {/* Selected Ticket Summary */}
-                {selectedTicket && (
-                <div className="purchase-summary">
-                    <h4>Purchase Summary</h4>
-                    <div className="summary-item">
-                    <span>Ticket Type:</span>
-                    <span>{selectedTicket.type}</span>
-                    </div>
-                    <div className="summary-item">
-                    <span>Price:</span>
-                    <span>{selectedTicket.price} FLT</span>
-                    </div>
-                    <div className="summary-item total">
-                    <span>Total:</span>
-                    <span>{selectedTicket.price} FLT</span>
-                    </div>
+                {/* Action Buttons */}
+                <div className="modal-actions">
+                    <Button
+                        variant="secondary"
+                        onClick={onClose}
+                        disabled={purchasing}
+                    >
+                        {purchaseResult?.success ? 'Close' : 'Cancel'}
+                    </Button>
+                    
+                    {!purchaseResult && (
+                        <Button
+                            variant="primary"
+                            onClick={handleConfirm}
+                            disabled={
+                                purchasing || 
+                                !selectedTicket || 
+                                userBalance < (selectedTicket?.price || event.price.flt) ||
+                                (selectedTicket?.available === 0)
+                            }
+                        >
+                            {purchasing && <Loader size={16} className="spinner" />}
+                            {purchasing ? 'Processing...' : `Confirm Purchase (${selectedTicket?.price || event.price.flt} FLT)`}
+                        </Button>
+                    )}
                 </div>
-                )}
-            </>
-            )}
-
-            {/* Action Buttons */}
-            <div className="modal-actions">
-            <Button
-                variant="secondary"
-                onClick={onClose}
-                disabled={purchasing}
-            >
-                {purchaseResult?.success ? 'Close' : 'Cancel'}
-            </Button>
-            
-            {!purchaseResult && (
-                <Button
-                variant="primary"
-                onClick={handleConfirm}
-                disabled={
-                    purchasing || 
-                    !selectedTicket || 
-                    userBalance < (selectedTicket?.price || event.price.flt) ||
-                    (selectedTicket?.available === 0)
-                }
-                >
-                {purchasing && <Loader size={16} className="spinner" />}
-                {purchasing ? 'Processing...' : `Confirm Purchase (${selectedTicket?.price || event.price.flt} FLT)`}
-                </Button>
-            )}
             </div>
-        </div>
         </div>
     );
 };

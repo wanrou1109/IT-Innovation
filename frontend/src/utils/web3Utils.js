@@ -1,4 +1,5 @@
-import { CONTRACT_ADDRESSES, NETWORK_CONFIG, ERROR_MESSAGES } from './constants';
+import { ethers } from 'ethers';
+import { CONTRACT_ADDRESSES, NETWORK_CONFIG } from './constants';
 
 /**
  * 檢查是否安裝了 MetaMask
@@ -395,7 +396,11 @@ export const removeWalletListeners = () => {
  * @returns {boolean} 是否支持
  */
 export const isSupportedNetwork = (chainId) => {
-  return Object.values(NETWORK_CONFIG).some(config => config.chainId === chainId);
+  const supportedChains = [
+    '0xaa36a7', // Sepolia (11155111)
+    '0x7A69',   // Localhost (31337) - 開發用
+  ];
+  return supportedChains.includes(chainId);
 };
 
 /**
@@ -427,7 +432,428 @@ export const simulateContractCall = async (contractAddress, method, params = [])
   }
 };
 
-export default {
+// ========== 區塊鏈互動工具 ==========
+
+// 1. 載入 ABI（自動貼上）
+export const CONCERT_TICKET_NFT_ABI = [
+  {"type":"constructor","inputs":[{"name":"_verificationRegistry","type":"address","internalType":"address"}],"stateMutability":"nonpayable"},
+  {"type":"function","name":"MAX_TRANSFER_COUNT","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"MIN_PURCHASE_INTERVAL","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"PLATFORM_FEE","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"approve","inputs":[{"name":"to","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"balanceOf","inputs":[{"name":"owner","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"buyResaleTicket","inputs":[{"name":"orderId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"payable"},
+  {"type":"function","name":"cancelResaleOrder","inputs":[{"name":"orderId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"concertLimits","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"perWallet","type":"uint256","internalType":"uint256"},{"name":"perIdentity","type":"uint256","internalType":"uint256"},{"name":"timeWindow","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"concerts","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"id","type":"uint256","internalType":"uint256"},{"name":"name","type":"string","internalType":"string"},{"name":"artist","type":"string","internalType":"string"},{"name":"venue","type":"string","internalType":"string"},{"name":"date","type":"uint256","internalType":"uint256"},{"name":"totalTickets","type":"uint256","internalType":"uint256"},{"name":"soldTickets","type":"uint256","internalType":"uint256"},{"name":"originalPrice","type":"uint256","internalType":"uint256"},{"name":"maxResalePrice","type":"uint256","internalType":"uint256"},{"name":"resaleCooldown","type":"uint256","internalType":"uint256"},{"name":"organizer","type":"address","internalType":"address"},{"name":"transferEnabled","type":"bool","internalType":"bool"},{"name":"whitelistOnly","type":"bool","internalType":"bool"},{"name":"isActive","type":"bool","internalType":"bool"},{"name":"minVerificationLevel","type":"uint8","internalType":"uint8"}],"stateMutability":"view"},
+  {"type":"function","name":"createConcert","inputs":[{"name":"_name","type":"string","internalType":"string"},{"name":"_artist","type":"string","internalType":"string"},{"name":"_venue","type":"string","internalType":"string"},{"name":"_date","type":"uint256","internalType":"uint256"},{"name":"_totalTickets","type":"uint256","internalType":"uint256"},{"name":"_originalPrice","type":"uint256","internalType":"uint256"},{"name":"_resaleCooldown","type":"uint256","internalType":"uint256"},{"name":"_whitelistOnly","type":"bool","internalType":"bool"},{"name":"_minVerificationLevel","type":"uint8","internalType":"uint8"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"nonpayable"},
+  {"type":"function","name":"emergencyWithdraw","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"getActiveResaleOrders","inputs":[{"name":"limit","type":"uint256","internalType":"uint256"},{"name":"offset","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"orders","type":"tuple[]","internalType":"struct ConcertTicketNFT.ResaleOrder[]","components":[{"name":"ticketId","type":"uint256","internalType":"uint256"},{"name":"seller","type":"address","internalType":"address"},{"name":"price","type":"uint256","internalType":"uint256"},{"name":"listTime","type":"uint256","internalType":"uint256"},{"name":"deadline","type":"uint256","internalType":"uint256"},{"name":"isActive","type":"bool","internalType":"bool"}]}],"stateMutability":"view"},
+  {"type":"function","name":"getApproved","inputs":[{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"getConcertDetails","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"name","type":"string","internalType":"string"},{"name":"artist","type":"string","internalType":"string"},{"name":"venue","type":"string","internalType":"string"},{"name":"date","type":"uint256","internalType":"uint256"},{"name":"originalPrice","type":"uint256","internalType":"uint256"},{"name":"maxResalePrice","type":"uint256","internalType":"uint256"},{"name":"soldTickets","type":"uint256","internalType":"uint256"},{"name":"totalTickets","type":"uint256","internalType":"uint256"},{"name":"isActive","type":"bool","internalType":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"getTicketDetails","inputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"seatNumber","type":"uint256","internalType":"uint256"},{"name":"seatSection","type":"string","internalType":"string"},{"name":"originalBuyer","type":"address","internalType":"address"},{"name":"currentOwner","type":"address","internalType":"address"},{"name":"isUsed","type":"bool","internalType":"bool"},{"name":"transferCount","type":"uint8","internalType":"uint8"},{"name":"originalPrice","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"getUserTickets","inputs":[{"name":"user","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"uint256[]","internalType":"uint256[]"}],"stateMutability":"view"},
+  {"type":"function","name":"identityPurchaseCount","inputs":[{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"bytes32","internalType":"bytes32"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"isApprovedForAll","inputs":[{"name":"owner","type":"address","internalType":"address"},{"name":"operator","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"lastPurchaseTime","inputs":[{"name":"","type":"address","internalType":"address"},{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"listTicketForSale","inputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"},{"name":"price","type":"uint256","internalType":"uint256"},{"name":"deadline","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"name","inputs":[],"outputs":[{"name":"","type":"string","internalType":"string"}],"stateMutability":"view"},
+  {"type":"function","name":"owner","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"ownerOf","inputs":[{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},
+  {"type":"function","name":"pause","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"paused","inputs":[],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"purchaseCount","inputs":[{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"purchaseTicket","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"seatNumber","type":"uint256","internalType":"uint256"},{"name":"seatSection","type":"string","internalType":"string"}],"outputs":[],"stateMutability":"payable"},
+  {"type":"function","name":"renounceOwnership","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"resaleOrders","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"},{"name":"seller","type":"address","internalType":"address"},{"name":"price","type":"uint256","internalType":"uint256"},{"name":"listTime","type":"uint256","internalType":"uint256"},{"name":"deadline","type":"uint256","internalType":"uint256"},{"name":"isActive","type":"bool","internalType":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"safeTransferFrom","inputs":[{"name":"from","type":"address","internalType":"address"},{"name":"to","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"safeTransferFrom","inputs":[{"name":"from","type":"address","internalType":"address"},{"name":"to","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"},{"name":"data","type":"bytes","internalType":"bytes"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"setApprovalForAll","inputs":[{"name":"operator","type":"address","internalType":"address"},{"name":"approved","type":"bool","internalType":"bool"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"setPurchaseLimits","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"_perWallet","type":"uint256","internalType":"uint256"},{"name":"_perIdentity","type":"uint256","internalType":"uint256"},{"name":"_timeWindow","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"supportsInterface","inputs":[{"name":"interfaceId","type":"bytes4","internalType":"bytes4"}],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"symbol","inputs":[],"outputs":[{"name":"","type":"string","internalType":"string"}],"stateMutability":"view"},
+  {"type":"function","name":"tickets","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"seatNumber","type":"uint256","internalType":"uint256"},{"name":"seatSection","type":"string","internalType":"string"},{"name":"originalBuyer","type":"address","internalType":"address"},{"name":"purchaseTime","type":"uint256","internalType":"uint256"},{"name":"originalPrice","type":"uint256","internalType":"uint256"},{"name":"identityHash","type":"bytes32","internalType":"bytes32"},{"name":"isUsed","type":"bool","internalType":"bool"},{"name":"transferCount","type":"uint8","internalType":"uint8"},{"name":"isRefundable","type":"bool","internalType":"bool"}],"stateMutability":"view"},
+  {"type":"function","name":"toggleConcert","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"tokenURI","inputs":[{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"string","internalType":"string"}],"stateMutability":"view"},
+  {"type":"function","name":"transferFrom","inputs":[{"name":"from","type":"address","internalType":"address"},{"name":"to","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"transferOwnership","inputs":[{"name":"newOwner","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"unpause","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"updateConcertSettings","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"_maxResalePrice","type":"uint256","internalType":"uint256"},{"name":"_transferEnabled","type":"bool","internalType":"bool"},{"name":"_minVerificationLevel","type":"uint8","internalType":"uint8"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"updateVerificationRegistry","inputs":[{"name":"newRegistry","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"useTicket","inputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"function","name":"userTickets","inputs":[{"name":"","type":"address","internalType":"address"},{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
+  {"type":"function","name":"verificationRegistry","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract VerificationRegistry"}],"stateMutability":"view"},
+  {"type":"function","name":"verifyTicketForEntry","inputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"},{"name":"identityHash","type":"bytes32","internalType":"bytes32"},{"name":"signature","type":"bytes","internalType":"bytes"}],"outputs":[{"name":"isValid","type":"bool","internalType":"bool"},{"name":"reason","type":"string","internalType":"string"}],"stateMutability":"view"},
+  {"type":"function","name":"withdrawPlatformFees","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+  {"type":"event","name":"Approval","inputs":[{"name":"owner","type":"address","indexed":true,"internalType":"address"},{"name":"approved","type":"address","indexed":true,"internalType":"address"},{"name":"tokenId","type":"uint256","indexed":true,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"ApprovalForAll","inputs":[{"name":"owner","type":"address","indexed":true,"internalType":"address"},{"name":"operator","type":"address","indexed":true,"internalType":"address"},{"name":"approved","type":"bool","indexed":false,"internalType":"bool"}],"anonymous":false},
+  {"type":"event","name":"BatchMetadataUpdate","inputs":[{"name":"_fromTokenId","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"_toTokenId","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"ConcertCreated","inputs":[{"name":"concertId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"name","type":"string","indexed":false,"internalType":"string"},{"name":"organizer","type":"address","indexed":true,"internalType":"address"},{"name":"totalTickets","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"price","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"ConcertStatusChanged","inputs":[{"name":"concertId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"isActive","type":"bool","indexed":false,"internalType":"bool"}],"anonymous":false},
+  {"type":"event","name":"EmergencyWithdrawal","inputs":[{"name":"organizer","type":"address","indexed":true,"internalType":"address"},{"name":"amount","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"MetadataUpdate","inputs":[{"name":"_tokenId","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"OwnershipTransferred","inputs":[{"name":"previousOwner","type":"address","indexed":true,"internalType":"address"},{"name":"newOwner","type":"address","indexed":true,"internalType":"address"}],"anonymous":false},
+  {"type":"event","name":"Paused","inputs":[{"name":"account","type":"address","indexed":false,"internalType":"address"}],"anonymous":false},
+  {"type":"event","name":"TicketListed","inputs":[{"name":"orderId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"ticketId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"price","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"seller","type":"address","indexed":true,"internalType":"address"}],"anonymous":false},
+  {"type":"event","name":"TicketMinted","inputs":[{"name":"ticketId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"concertId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"buyer","type":"address","indexed":true,"internalType":"address"},{"name":"seatNumber","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"seatSection","type":"string","indexed":false,"internalType":"string"}],"anonymous":false},
+  {"type":"event","name":"TicketSold","inputs":[{"name":"orderId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"ticketId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"buyer","type":"address","indexed":true,"internalType":"address"},{"name":"price","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"TicketUsed","inputs":[{"name":"ticketId","type":"uint256","indexed":true,"internalType":"uint256"},{"name":"timestamp","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"Transfer","inputs":[{"name":"from","type":"address","indexed":true,"internalType":"address"},{"name":"to","type":"address","indexed":true,"internalType":"address"},{"name":"tokenId","type":"uint256","indexed":true,"internalType":"uint256"}],"anonymous":false},
+  {"type":"event","name":"Unpaused","inputs":[{"name":"account","type":"address","indexed":false,"internalType":"address"}],"anonymous":false},
+  {"type":"error","name":"ECDSAInvalidSignature","inputs":[]},
+  {"type":"error","name":"ECDSAInvalidSignatureLength","inputs":[{"name":"length","type":"uint256","internalType":"uint256"}]},
+  {"type":"error","name":"ECDSAInvalidSignatureS","inputs":[{"name":"s","type":"bytes32","internalType":"bytes32"}]},
+  {"type":"error","name":"ERC721IncorrectOwner","inputs":[{"name":"sender","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"},{"name":"owner","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ERC721InsufficientApproval","inputs":[{"name":"operator","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"}]},
+  {"type":"error","name":"ERC721InvalidApprover","inputs":[{"name":"approver","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ERC721InvalidOperator","inputs":[{"name":"operator","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ERC721InvalidOwner","inputs":[{"name":"owner","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ERC721InvalidReceiver","inputs":[{"name":"receiver","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ERC721InvalidSender","inputs":[{"name":"sender","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ERC721NonexistentToken","inputs":[{"name":"tokenId","type":"uint256","internalType":"uint256"}]},
+  {"type":"error","name":"EnforcedPause","inputs":[]},
+  {"type":"error","name":"ExpectedPause","inputs":[]},
+  {"type":"error","name":"OwnableInvalidOwner","inputs":[{"name":"owner","type":"address","internalType":"address"}]},
+  {"type":"error","name":"OwnableUnauthorizedAccount","inputs":[{"name":"account","type":"address","internalType":"address"}]},
+  {"type":"error","name":"ReentrancyGuardReentrantCall","inputs":[]}
+];
+
+// 2. 合約地址（這裡用 constants.js 的 NFT_CONTRACT）
+export const CONCERT_TICKET_NFT_ADDRESS = CONTRACT_ADDRESSES.NFT_CONTRACT;
+
+// 3. 建立 provider
+export function getProvider() {
+  if (window.ethereum) {
+    return new ethers.BrowserProvider(window.ethereum);
+  }
+  throw new Error('請安裝 MetaMask 或其他以太坊錢包');
+}
+
+// 4. 取得 signer（用戶錢包）
+export async function getSigner() {
+  const provider = getProvider();
+  await provider.send('eth_requestAccounts', []);
+  return await provider.getSigner();
+}
+
+// 5. 建立合約實例
+export async function getConcertTicketNFTContract() {
+  const signer = await getSigner();
+  return new ethers.Contract(
+    CONCERT_TICKET_NFT_ADDRESS,
+    CONCERT_TICKET_NFT_ABI,
+    signer
+  );
+}
+
+// ========== 合約資料讀取與格式化工具 ==========
+
+/**
+ * 讀取所有演唱會資料
+ */
+export async function getAllConcerts() {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    const concerts = [];
+    
+    // 從 concertId 1 開始讀取，直到找不到為止
+    let concertId = 1;
+    while (true) {
+      try {
+        const concertData = await contract.getConcertDetails(concertId);
+        
+        // 如果演唱會名稱為空，表示不存在
+        if (!concertData[0]) break;
+        
+        const [name, artist, venue, date, originalPrice, maxResalePrice, soldTickets, totalTickets, isActive] = concertData;
+        
+        concerts.push({
+          id: concertId,
+          title: name,
+          artist: artist,
+          venue: venue,
+          date: new Date(Number(date) * 1000).toISOString().split('T')[0], // 轉換 timestamp 為日期
+          time: '19:00', // 預設時間，可以後續從合約擴展
+          image: '/api/placeholder/400/250', // 預設圖片
+          price: {
+            flt: Number(originalPrice) / 1e18, // 從 wei 轉換為 ETH
+            usd: Math.round(Number(originalPrice) / 1e18 * 2000) // 假設 1 ETH = 2000 USD
+          },
+          totalTickets: Number(totalTickets),
+          soldTickets: Number(soldTickets),
+          maxResalePrice: Number(maxResalePrice) / 1e18,
+          status: isActive ? 'on_sale' : 'cancelled',
+          description: `Experience the electrifying performance of ${artist}.`,
+          category: 'concert',
+          isPrimary: true,
+          ticketTypes: [
+            {
+              type: 'General',
+              price: Number(originalPrice) / 1e18,
+              available: Number(totalTickets) - Number(soldTickets),
+              benefits: ['Standard seating', 'Digital program', 'Participation NFT']
+            }
+          ]
+        });
+        
+        concertId++;
+      } catch (error) {
+        // 如果讀取失敗，可能是 concertId 不存在
+        break;
+      }
+    }
+    
+    return concerts;
+  } catch (error) {
+    console.error('Error fetching concerts:', error);
+    return [];
+  }
+}
+
+/**
+ * 讀取用戶擁有的票券
+ */
+export async function getUserTickets(userAddress) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    const ticketIds = await contract.getUserTickets(userAddress);
+    const tickets = [];
+    
+    for (const ticketId of ticketIds) {
+      try {
+        const ticketDetails = await contract.getTicketDetails(Number(ticketId));
+        const [concertId, seatNumber, seatSection, , , isUsed, transferCount, originalPrice] = ticketDetails;
+        
+        // 獲取演唱會詳情
+        const concertData = await contract.getConcertDetails(Number(concertId));
+        const [name, artist, venue, date] = concertData;
+        
+        tickets.push({
+          id: Number(ticketId),
+          event: name,
+          artist: artist,
+          venue: venue,
+          date: new Date(Number(date) * 1000).toISOString().split('T')[0],
+          time: '19:00',
+          type: 'General',
+          price: Number(originalPrice) / 1e18,
+          seatNumber: Number(seatNumber),
+          seatSection: seatSection,
+          qrCode: `QR${ticketId}`,
+          image: '/api/placeholder/400/250',
+          resellable: !isUsed && Number(transferCount) < 3, // 假設最多轉手 3 次
+          purchaseTime: new Date().toISOString(), // 可以從事件日誌獲取
+          status: isUsed ? 'used' : 'valid',
+          isUsed: isUsed,
+          transferCount: Number(transferCount)
+        });
+      } catch (error) {
+        console.error(`Error fetching ticket ${ticketId}:`, error);
+      }
+    }
+    
+    return tickets;
+  } catch (error) {
+    console.error('Error fetching user tickets:', error);
+    return [];
+  }
+}
+
+/**
+ * 讀取轉售訂單
+ */
+export async function getResaleOrders(limit = 50, offset = 0) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    const orders = await contract.getActiveResaleOrders(limit, offset);
+    const resaleTickets = [];
+    
+    for (let i = 0; i < orders.length; i++) {
+      try {
+        const order = orders[i];
+        // 解構 ResaleOrder 結構
+        const [ticketId, seller, price, listTime, deadline, isActive] = order;
+        
+        if (!isActive) continue;
+        
+        // orderId 是基於 offset 的索引
+        const orderId = offset + i + 1;
+        
+        // 獲取票券詳情
+        const ticketDetails = await contract.getTicketDetails(Number(ticketId));
+        const [concertId, seatNumber, seatSection, , , , , originalPrice] = ticketDetails;
+        
+        // 獲取演唱會詳情
+        const concertData = await contract.getConcertDetails(Number(concertId));
+        const [name, artist, venue, date] = concertData;
+        
+        resaleTickets.push({
+          resaleId: `${ticketId}-${orderId}`,
+          orderId: orderId,
+          id: Number(ticketId),
+          event: name,
+          artist: artist,
+          venue: venue,
+          date: new Date(Number(date) * 1000).toISOString().split('T')[0],
+          time: '19:00',
+          type: 'General',
+          originalPrice: Number(originalPrice) / 1e18,
+          resalePrice: Number(price) / 1e18,
+          seatNumber: Number(seatNumber),
+          seatSection: seatSection,
+          image: '/api/placeholder/400/250',
+          isAvailable: true,
+          listTime: new Date(Number(listTime) * 1000).toISOString(),
+          deadline: new Date(Number(deadline) * 1000).toISOString(),
+          seller: {
+            name: `User${seller.slice(-4)}`, // 簡化的用戶名
+            address: seller,
+            verificationLevel: 'Bronze', // 可以從驗證合約獲取
+            salesCount: Math.floor(Math.random() * 10) + 1,
+            rating: (Math.random() * 1.5 + 3.5).toFixed(1),
+            joinDate: '2023-06-15',
+            successRate: Math.floor(Math.random() * 20) + 80
+          }
+        });
+      } catch (error) {
+        console.error('Error processing resale order:', error);
+      }
+    }
+    
+    return resaleTickets;
+  } catch (error) {
+    console.error('Error fetching resale orders:', error);
+    return [];
+  }
+}
+
+/**
+ * 購買票券
+ */
+export async function purchaseTicketFromContract(concertId, seatNumber, seatSection, price) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    
+    // 調用合約的 purchaseTicket 函數
+    const tx = await contract.purchaseTicket(concertId, seatNumber, seatSection, {
+      value: ethers.parseEther(price.toString())
+    });
+    
+    // 等待交易確認
+    const receipt = await tx.wait();
+    
+    // 從事件日誌中獲取 ticketId
+    const ticketMintedEvent = receipt.logs.find(log => {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        return parsed.name === 'TicketMinted';
+      } catch {
+        return false;
+      }
+    });
+    
+    let ticketId = null;
+    if (ticketMintedEvent) {
+      const parsed = contract.interface.parseLog(ticketMintedEvent);
+      ticketId = Number(parsed.args.ticketId);
+    }
+    
+    return {
+      success: true,
+      ticketId: ticketId,
+      transactionHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  } catch (error) {
+    console.error('Error purchasing ticket:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 購買轉售票券
+ */
+export async function buyResaleTicketFromContract(orderId, price) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    
+    const tx = await contract.buyResaleTicket(orderId, {
+      value: ethers.parseEther(price.toString())
+    });
+    
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      transactionHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  } catch (error) {
+    console.error('Error buying resale ticket:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 將票券上架轉售
+ */
+export async function listTicketForSale(ticketId, price, deadline) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    
+    const tx = await contract.listTicketForSale(
+      ticketId,
+      ethers.parseEther(price.toString()),
+      Math.floor(new Date(deadline).getTime() / 1000)
+    );
+    
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      transactionHash: receipt.hash
+    };
+  } catch (error) {
+    console.error('Error listing ticket for sale:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 使用票券（入場）
+ */
+export async function useTicketForEntry(ticketId) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    
+    const tx = await contract.useTicket(ticketId);
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      transactionHash: receipt.hash
+    };
+  } catch (error) {
+    console.error('Error using ticket:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+const defaultExport = {
   isMetaMaskInstalled,
   getCurrentChainId,
   switchNetwork,
@@ -449,5 +875,13 @@ export default {
   removeWalletListeners,
   isSupportedNetwork,
   getContractAddress,
-  simulateContractCall
+  simulateContractCall,
+  getAllConcerts,
+  getUserTickets,
+  getResaleOrders,
+  purchaseTicketFromContract,
+  buyResaleTicketFromContract,
+  listTicketForSale,
+  useTicketForEntry
 };
+export default defaultExport;

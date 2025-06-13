@@ -1,15 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { useWallet } from '../hooks/useWallet.js';
-import Card from '../components/ui/Card.js';
-import Button from '../components/ui/Button.js';
-import { 
-  X, Calendar, MapPin, Clock, QrCode, ExternalLink, Copy, Check, 
-  Send, DollarSign, Loader, AlertTriangle, CheckCircle, User 
+import {
+    Calendar,
+    Check,
+    CheckCircle,
+    Clock,
+    Copy,
+    DollarSign,
+    ExternalLink,
+    Loader,
+    MapPin,
+    QrCode,
+    Send,
+    X
 } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Button from '../components/ui/Button.js';
+import Card from '../components/ui/Card.js';
+import { useWallet } from '../hooks/useWallet.js';
 import '../styles/pages/MyTickets.css';
+import {
+    getConcertTicketNFTContract,
+    getUserTickets,
+    listTicketForSale,
+    useTicketForEntry as markTicketAsUsed
+} from '../utils/web3Utils.js';
 
 const MyTickets = ({ ticketsTab = 'upcoming' }) => {
-  const { isConnected, formatAddress, walletInfo, updateBalance } = useWallet();
+  const { isConnected, formatAddress, walletInfo } = useWallet();
   const [userTickets, setUserTickets] = useState({ upcoming: [], past: [] });
   const [loading, setLoading] = useState(true);
   const [copiedHash, setCopiedHash] = useState('');
@@ -18,25 +34,16 @@ const MyTickets = ({ ticketsTab = 'upcoming' }) => {
   const [saleModal, setSaleModal] = useState({ show: false, ticket: null });
 
   // 載入用戶票券
-  useEffect(() => {
-    if (isConnected) {
-      loadUserTickets();
-    } else {
-      setUserTickets({ upcoming: [], past: [] });
-      setLoading(false);
-    }
-  }, [isConnected, ticketsTab]);
-
-  const loadUserTickets = () => {
+  const loadUserTickets = useCallback(async () => {
     setLoading(true);
     try {
-      const savedTickets = JSON.parse(localStorage.getItem('userTickets') || '[]');
+      const tickets = await getUserTickets(walletInfo.address);
       const now = new Date();
       
       const upcoming = [];
       const past = [];
       
-      savedTickets.forEach((ticket) => {
+      tickets.forEach((ticket) => {
         const ticketDate = new Date(ticket.date);
         
         // 比較日期（只比較年月日，忽略時間）
@@ -52,12 +59,21 @@ const MyTickets = ({ ticketsTab = 'upcoming' }) => {
       
       setUserTickets({ upcoming, past });
     } catch (error) {
-      console.error('Error loading tickets:', error);
+      console.error('Error loading tickets from blockchain:', error);
       setUserTickets({ upcoming: [], past: [] });
     } finally {
       setLoading(false);
     }
-  };
+  }, [walletInfo?.address]);
+
+  useEffect(() => {
+    if (isConnected && walletInfo?.address) {
+      loadUserTickets();
+    } else {
+      setUserTickets({ upcoming: [], past: [] });
+      setLoading(false);
+    }
+  }, [isConnected, walletInfo?.address, loadUserTickets]);
 
   // 複製交易哈希
   const copyTransactionHash = async (hash) => {
@@ -98,146 +114,114 @@ const MyTickets = ({ ticketsTab = 'upcoming' }) => {
   };
 
   // 確認轉售（掛到二手市場）
-  const confirmResale = (resaleData) => {
+  const confirmResale = async (resaleData) => {
     try {
-      // 更新票券狀態為轉售中
-      const updatedTickets = JSON.parse(localStorage.getItem('userTickets') || '[]');
-      const ticketIndex = updatedTickets.findIndex(t => t.id === resaleModal.ticket.id);
+      setLoading(true);
       
-      if (ticketIndex !== -1) {
-        updatedTickets[ticketIndex] = {
-          ...updatedTickets[ticketIndex],
-          isOnResale: true,
-          resalePrice: resaleData.price,
-          resaleReason: resaleData.reason,
-          resaleListedAt: new Date().toISOString()
-        };
-        localStorage.setItem('userTickets', JSON.stringify(updatedTickets));
+      // 計算截止時間（預設 30 天後）
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 30);
+      
+      // 調用智能合約的 listTicketForSale 函數
+      const result = await listTicketForSale(
+        resaleModal.ticket.id,
+        resaleData.price,
+        deadline.toISOString()
+      );
+      
+      if (result.success) {
+        // 重新載入票券
+        await loadUserTickets();
+        setResaleModal({ show: false, ticket: null });
+        alert(`Successfully listed ${resaleModal.ticket.event} for resale at ${resaleData.price} FLT!`);
+      } else {
+        alert(`Failed to list ticket for resale: ${result.error}`);
       }
-
-      // 添加到二手市場
-      const existingResaleTickets = JSON.parse(localStorage.getItem('resaleTickets') || '[]');
-      const resaleTicket = {
-        ...resaleModal.ticket,
-        resaleId: Date.now(),
-        sellerId: walletInfo.address,
-        resalePrice: resaleData.price,
-        originalPrice: resaleModal.ticket.price,
-        resaleReason: resaleData.reason,
-        listedAt: new Date().toISOString(),
-        isAvailable: true,
-        isPrimary: false,
-        seller: {
-          name: walletInfo.name || "Anonymous User",
-          address: walletInfo.address,
-          verificationLevel: 'Gold', // 可以根據實際用戶等級設定
-          salesCount: Math.floor(Math.random() * 10) + 1,
-          rating: (Math.random() * 1.5 + 3.5).toFixed(1),
-          joinDate: '2024-01-15',
-          successRate: Math.floor(Math.random() * 20) + 80
-        }
-      };
-      
-      existingResaleTickets.push(resaleTicket);
-      localStorage.setItem('resaleTickets', JSON.stringify(existingResaleTickets));
-
-      // 重新載入票券
-      loadUserTickets();
-      setResaleModal({ show: false, ticket: null });
-      
-      alert(`Successfully listed ${resaleModal.ticket.event} for resale at ${resaleData.price} FLT!`);
     } catch (error) {
       console.error('Error listing ticket for resale:', error);
       alert('Failed to list ticket for resale');
+    } finally {
+      setLoading(false);
     }
   };
 
   // 確認轉移
   const confirmTransfer = async (transferData) => {
     try {
-      // 模擬轉移交易
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      setLoading(true);
       
-      // 從用戶票券中移除
-      const updatedTickets = JSON.parse(localStorage.getItem('userTickets') || '[]');
-      const remainingTickets = updatedTickets.filter(t => t.id !== transferModal.ticket.id);
-      localStorage.setItem('userTickets', JSON.stringify(remainingTickets));
-
-      // 創建轉移記錄
-      const transferRecord = {
-        id: Date.now(),
-        ticketId: transferModal.ticket.id,
-        event: transferModal.ticket.event,
-        from: walletInfo.address,
-        to: transferData.toAddress,
-        transferTime: new Date().toISOString(),
-        transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
-        type: 'transfer',
-        reason: transferData.reason || 'Ticket Transfer'
-      };
-
-      // 保存轉移記錄
-      const existingTransfers = JSON.parse(localStorage.getItem('ticketTransfers') || '[]');
-      existingTransfers.push(transferRecord);
-      localStorage.setItem('ticketTransfers', JSON.stringify(existingTransfers));
-
-      // 重新載入票券
-      loadUserTickets();
-      setTransferModal({ show: false, ticket: null });
+      // 調用智能合約的轉移函數
+      const contract = await getConcertTicketNFTContract();
+      const tx = await contract.transferFrom(
+        walletInfo.address,
+        transferData.toAddress,
+        transferModal.ticket.id
+      );
       
-      alert(`Successfully transferred ${transferModal.ticket.event} to ${formatAddress(transferData.toAddress)}!`);
+      const receipt = await tx.wait();
+      
+      if (receipt.status === 1) {
+        // 重新載入票券
+        await loadUserTickets();
+        setTransferModal({ show: false, ticket: null });
+        alert(`Successfully transferred ${transferModal.ticket.event} to ${formatAddress(transferData.toAddress)}!`);
+      } else {
+        alert('Transfer failed');
+      }
     } catch (error) {
       console.error('Error transferring ticket:', error);
-      alert('Failed to transfer ticket');
+      alert(`Failed to transfer ticket: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   // 確認售出（直接賣給用戶）
   const confirmSale = async (saleData) => {
     try {
-      // 模擬售出交易
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      setLoading(true);
       
-      const salePrice = saleData.price;
-      const platformFee = salePrice * 0.05; // 5% 平台手續費
-      const sellerReceives = salePrice - platformFee;
-
-      // 更新用戶餘額
-      updateBalance(walletInfo.fltBalance + sellerReceives, walletInfo.ethBalance);
-
-      // 從用戶票券中移除
-      const updatedTickets = JSON.parse(localStorage.getItem('userTickets') || '[]');
-      const remainingTickets = updatedTickets.filter(t => t.id !== saleModal.ticket.id);
-      localStorage.setItem('userTickets', JSON.stringify(remainingTickets));
-
-      // 創建售出記錄
-      const saleRecord = {
-        id: Date.now(),
-        ticketId: saleModal.ticket.id,
-        event: saleModal.ticket.event,
-        seller: walletInfo.address,
-        buyer: saleData.buyerAddress,
-        salePrice: salePrice,
-        platformFee: platformFee,
-        sellerReceives: sellerReceives,
-        saleTime: new Date().toISOString(),
-        transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
-        type: 'sale'
-      };
-
-      // 保存售出記錄
-      const existingSales = JSON.parse(localStorage.getItem('ticketSales') || '[]');
-      existingSales.push(saleRecord);
-      localStorage.setItem('ticketSales', JSON.stringify(existingSales));
-
-      // 重新載入票券
-      loadUserTickets();
-      setSaleModal({ show: false, ticket: null });
+      // 這裡可以實作直接售出的邏輯
+      // 目前先使用轉售功能
+      const result = await listTicketForSale(
+        saleModal.ticket.id,
+        saleData.price,
+        new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24小時後截止
+      );
       
-      alert(`Successfully sold ${saleModal.ticket.event} to ${formatAddress(saleData.buyerAddress)} for ${salePrice} FLT! You received ${sellerReceives.toFixed(2)} FLT after platform fees.`);
+      if (result.success) {
+        await loadUserTickets();
+        setSaleModal({ show: false, ticket: null });
+        alert(`Successfully listed ${saleModal.ticket.event} for immediate sale at ${saleData.price} FLT!`);
+      } else {
+        alert(`Failed to list ticket for sale: ${result.error}`);
+      }
     } catch (error) {
       console.error('Error selling ticket:', error);
       alert('Failed to sell ticket');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 使用票券（入場）
+  const handleUseTicket = async (ticket) => {
+    try {
+      setLoading(true);
+      
+      const result = await markTicketAsUsed(ticket.id);
+      
+      if (result.success) {
+        await loadUserTickets();
+        alert(`Successfully used ticket for ${ticket.event}!`);
+      } else {
+        alert(`Failed to use ticket: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error using ticket:', error);
+      alert(`Failed to use ticket: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -342,6 +326,7 @@ const MyTickets = ({ ticketsTab = 'upcoming' }) => {
                 onResale={handleResaleTicket}
                 onTransfer={handleTransferTicket}
                 onSell={handleSellTicket}
+                onUse={handleUseTicket}
               />
             ))}
           </div>
@@ -436,7 +421,7 @@ const MyTickets = ({ ticketsTab = 'upcoming' }) => {
 };
 
 // Enhanced Ticket Card Component
-const TicketCard = ({ ticket, isPast, onCopyHash, copiedHash, onResale, onTransfer, onSell }) => {
+const TicketCard = ({ ticket, isPast, onCopyHash, copiedHash, onResale, onTransfer, onSell, onUse }) => {
   const [imageError, setImageError] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
@@ -560,6 +545,26 @@ const TicketCard = ({ ticket, isPast, onCopyHash, copiedHash, onResale, onTransf
               >
                 QR Code
               </Button>
+              
+              {/* 使用票券按鈕 - 只在演唱會當天或之後顯示 */}
+              {(() => {
+                const ticketDate = new Date(ticket.date);
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const ticketDateOnly = new Date(ticketDate.getFullYear(), ticketDate.getMonth(), ticketDate.getDate());
+                const canUse = ticketDateOnly <= today && !ticket.isUsed;
+                
+                return canUse && (
+                  <Button
+                    variant="success"
+                    size="small"
+                    icon={<CheckCircle size={16} />}
+                    onClick={() => onUse && onUse(ticket)}
+                  >
+                    Use Ticket
+                  </Button>
+                );
+              })()}
               
               {ticket.resellable && !ticket.isOnResale && (
                 <>
