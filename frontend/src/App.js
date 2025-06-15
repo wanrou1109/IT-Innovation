@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import Layout from './components/layout/Layout.js';
-import Home from './pages/Home.js';
 import Dashboard from './pages/Dashboard.js';
-import MyTickets from './pages/MyTickets.js';
+import Home from './pages/Home.js';
 import MyNFTs from './pages/MyNFTs.js';
-import Report from './pages/Report.js';
-import Profile from './pages/Profile.js';
+import MyTickets from './pages/MyTickets.js';
 import Notifications from './pages/Notifications.js';
+import OrganizerDashboard from './pages/OrganizerDashboard.js';
+import Profile from './pages/Profile.js';
+import Report from './pages/Report.js';
 
 // Providers
-import { WalletProvider } from './hooks/useWallet.js';
-import { NFTProvider } from './hooks/useNFT.js';
 import { FLTProvider } from './hooks/useFLT.js';
+import { NFTProvider } from './hooks/useNFT.js';
+import { WalletProvider } from './hooks/useWallet.js';
 
 import './App.css';
 
@@ -45,6 +46,8 @@ function App() {
         return <Profile />;
       case 'notifications':
         return <Notifications />;
+      case 'organizer':
+        return <OrganizerDashboard />;
       default:
         return (
           <Home 

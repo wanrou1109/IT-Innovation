@@ -1,6 +1,26 @@
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, NETWORK_CONFIG } from './constants';
 
+// ========== FLT 代幣配置 ==========
+
+// FLT 代幣合約地址 (Sepolia)
+export const FLT_TOKEN_ADDRESS = process.env.REACT_APP_FLT_TOKEN_ADDRESS || '0x8fAC18B399599c92C650DbbeeceC9885DEf08aDE';
+
+// FLT ERC20 ABI（標準 ERC20）
+export const FLT_TOKEN_ABI = [
+  {"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},
+  {"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},
+  {"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},
+  {"constant":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},
+  {"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},
+  {"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},
+  {"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},
+  {"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},
+  {"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"}
+];
+
 /**
  * 檢查是否安裝了 MetaMask
  * @returns {boolean} 是否安裝 MetaMask
@@ -463,7 +483,7 @@ export const CONCERT_TICKET_NFT_ABI = [
   {"type":"function","name":"pause","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
   {"type":"function","name":"paused","inputs":[],"outputs":[{"name":"","type":"bool","internalType":"bool"}],"stateMutability":"view"},
   {"type":"function","name":"purchaseCount","inputs":[{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"address","internalType":"address"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
-  {"type":"function","name":"purchaseTicket","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"seatNumber","type":"uint256","internalType":"uint256"},{"name":"seatSection","type":"string","internalType":"string"}],"outputs":[],"stateMutability":"payable"},
+  {"type":"function","name":"purchaseTicket","inputs":[{"name":"concertId","type":"uint256","internalType":"uint256"},{"name":"seatNumber","type":"uint256","internalType":"uint256"},{"name":"seatSection","type":"string","internalType":"string"}],"outputs":[],"stateMutability":"nonpayable"},
   {"type":"function","name":"renounceOwnership","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
   {"type":"function","name":"resaleOrders","inputs":[{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"},{"name":"seller","type":"address","internalType":"address"},{"name":"price","type":"uint256","internalType":"uint256"},{"name":"listTime","type":"uint256","internalType":"uint256"},{"name":"deadline","type":"uint256","internalType":"uint256"},{"name":"isActive","type":"bool","internalType":"bool"}],"stateMutability":"view"},
   {"type":"function","name":"safeTransferFrom","inputs":[{"name":"from","type":"address","internalType":"address"},{"name":"to","type":"address","internalType":"address"},{"name":"tokenId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
@@ -483,6 +503,7 @@ export const CONCERT_TICKET_NFT_ABI = [
   {"type":"function","name":"useTicket","inputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
   {"type":"function","name":"userTickets","inputs":[{"name":"","type":"address","internalType":"address"},{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
   {"type":"function","name":"verificationRegistry","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract VerificationRegistry"}],"stateMutability":"view"},
+  {"type":"function","name":"fltToken","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IERC20"}],"stateMutability":"view"},
   {"type":"function","name":"verifyTicketForEntry","inputs":[{"name":"ticketId","type":"uint256","internalType":"uint256"},{"name":"identityHash","type":"bytes32","internalType":"bytes32"},{"name":"signature","type":"bytes","internalType":"bytes"}],"outputs":[{"name":"isValid","type":"bool","internalType":"bool"},{"name":"reason","type":"string","internalType":"string"}],"stateMutability":"view"},
   {"type":"function","name":"withdrawPlatformFees","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
   {"type":"event","name":"Approval","inputs":[{"name":"owner","type":"address","indexed":true,"internalType":"address"},{"name":"approved","type":"address","indexed":true,"internalType":"address"},{"name":"tokenId","type":"uint256","indexed":true,"internalType":"uint256"}],"anonymous":false},
@@ -611,25 +632,82 @@ export async function getAllConcerts() {
 }
 
 /**
- * 讀取用戶擁有的票券
+ * 備用方法：通過 balanceOf 和 tokenOfOwnerByIndex 獲取用戶票券
  */
-export async function getUserTickets(userAddress) {
+export async function getUserTicketsByBalance(userAddress) {
   try {
     const contract = await getConcertTicketNFTContract();
-    const ticketIds = await contract.getUserTickets(userAddress);
+    
+    // 獲取用戶擁有的 NFT 數量
+    const balance = await contract.balanceOf(userAddress);
+    const balanceNumber = Number(balance);
+    
+    console.log(`User ${userAddress} has ${balanceNumber} NFTs`);
+    
+    if (balanceNumber === 0) {
+      return [];
+    }
+    
     const tickets = [];
     
-    for (const ticketId of ticketIds) {
+    // 遍歷用戶的每個 NFT
+    for (let i = 0; i < balanceNumber; i++) {
       try {
-        const ticketDetails = await contract.getTicketDetails(Number(ticketId));
+        console.log(`Getting token at index ${i}...`);
+        
+        // 嘗試使用 tokenOfOwnerByIndex (ERC721Enumerable)
+        let tokenId;
+        try {
+          tokenId = await contract.tokenOfOwnerByIndex(userAddress, i);
+          console.log(`tokenOfOwnerByIndex(${i}) = ${tokenId}`);
+        } catch (enumerableError) {
+          console.warn(`tokenOfOwnerByIndex failed:`, enumerableError);
+          // 如果沒有 enumerable，直接嘗試 token ID 1
+          if (i === 0) {
+            const owner = await contract.ownerOf(1);
+            if (owner.toLowerCase() === userAddress.toLowerCase()) {
+              tokenId = 1;
+              console.log(`Using direct token ID 1 as fallback`);
+            } else {
+              console.log(`Token 1 is owned by ${owner}, not ${userAddress}`);
+              continue;
+            }
+          } else {
+            continue;
+          }
+        }
+        
+        const ticketIdNumber = Number(tokenId);
+        console.log(`Processing ticket ID: ${ticketIdNumber}`);
+        
+        // 獲取票券詳情
+        let ticketDetails;
+        try {
+          ticketDetails = await contract.getTicketDetails(ticketIdNumber);
+          console.log(`Ticket details:`, ticketDetails);
+        } catch (ticketError) {
+          console.error(`getTicketDetails(${ticketIdNumber}) failed:`, ticketError);
+          continue;
+        }
+        
         const [concertId, seatNumber, seatSection, , , isUsed, transferCount, originalPrice] = ticketDetails;
+        console.log(`Concert ID: ${concertId}, Seat: ${seatNumber}, Section: ${seatSection}`);
         
         // 獲取演唱會詳情
-        const concertData = await contract.getConcertDetails(Number(concertId));
+        let concertData;
+        try {
+          concertData = await contract.getConcertDetails(Number(concertId));
+          console.log(`Concert details:`, concertData);
+        } catch (concertError) {
+          console.error(`getConcertDetails(${concertId}) failed:`, concertError);
+          // 使用默認值繼續
+          concertData = ['Unknown Concert', 'Unknown Artist', 'Unknown Venue', Math.floor(Date.now() / 1000)];
+        }
+        
         const [name, artist, venue, date] = concertData;
         
-        tickets.push({
-          id: Number(ticketId),
+        const ticket = {
+          id: ticketIdNumber,
           event: name,
           artist: artist,
           venue: venue,
@@ -639,20 +717,144 @@ export async function getUserTickets(userAddress) {
           price: Number(originalPrice) / 1e18,
           seatNumber: Number(seatNumber),
           seatSection: seatSection,
-          qrCode: `QR${ticketId}`,
+          qrCode: `QR${ticketIdNumber}`,
           image: '/api/placeholder/400/250',
-          resellable: !isUsed && Number(transferCount) < 3, // 假設最多轉手 3 次
-          purchaseTime: new Date().toISOString(), // 可以從事件日誌獲取
+          resellable: !isUsed && Number(transferCount) < 3,
+          purchaseTime: new Date().toISOString(),
           status: isUsed ? 'used' : 'valid',
           isUsed: isUsed,
           transferCount: Number(transferCount)
-        });
+        };
+        
+        console.log(`Successfully created ticket:`, ticket);
+        tickets.push(ticket);
+        
       } catch (error) {
-        console.error(`Error fetching ticket ${ticketId}:`, error);
+        console.error(`Error fetching ticket at index ${i}:`, error);
       }
     }
     
+    console.log(`Total tickets found: ${tickets.length}`);
     return tickets;
+  } catch (error) {
+    console.error('Error fetching user tickets by balance:', error);
+    return [];
+  }
+}
+
+/**
+ * 調試函數：直接檢查特定 token ID 的擁有者
+ */
+export async function checkTokenOwnership(tokenId, userAddress) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    
+    // 檢查 token 是否存在
+    const owner = await contract.ownerOf(tokenId);
+    console.log(`Token ${tokenId} is owned by: ${owner}`);
+    console.log(`User address: ${userAddress}`);
+    console.log(`Addresses match: ${owner.toLowerCase() === userAddress.toLowerCase()}`);
+    
+    if (owner.toLowerCase() === userAddress.toLowerCase()) {
+      // 獲取票券詳情
+      const ticketDetails = await contract.getTicketDetails(tokenId);
+      console.log('Ticket details:', ticketDetails);
+      
+      // 獲取演唱會詳情
+      const [concertId] = ticketDetails;
+      const concertData = await contract.getConcertDetails(Number(concertId));
+      console.log('Concert details:', concertData);
+      
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`Error checking token ${tokenId} ownership:`, error);
+    return false;
+  }
+}
+
+/**
+ * 獲取用戶票券（優先使用合約的 getUserTickets 方法）
+ */
+export async function getUserTickets(userAddress) {
+  try {
+    console.log(`Fetching tickets for user: ${userAddress}`);
+    const contract = await getConcertTicketNFTContract();
+    
+    // 首先嘗試使用合約的 getUserTickets 方法
+    try {
+      console.log('Calling contract.getUserTickets...');
+    const ticketIds = await contract.getUserTickets(userAddress);
+      console.log('Received ticket IDs:', ticketIds);
+      
+    const tickets = [];
+    
+    for (const ticketId of ticketIds) {
+      try {
+          const ticketIdNumber = Number(ticketId);
+          console.log(`Processing ticket ID: ${ticketIdNumber}`);
+          
+          // 獲取票券詳情
+          const ticketDetails = await contract.getTicketDetails(ticketIdNumber);
+          console.log(`Ticket details for ${ticketIdNumber}:`, ticketDetails);
+          
+        const [concertId, seatNumber, seatSection, , , isUsed, transferCount, originalPrice] = ticketDetails;
+        
+        // 獲取演唱會詳情
+          let concertData;
+          try {
+            concertData = await contract.getConcertDetails(Number(concertId));
+            console.log(`Concert details for ${concertId}:`, concertData);
+          } catch (concertError) {
+            console.error(`getConcertDetails(${concertId}) failed:`, concertError);
+            // 使用默認值繼續
+            concertData = ['Unknown Concert', 'Unknown Artist', 'Unknown Venue', Math.floor(Date.now() / 1000)];
+          }
+          
+        const [name, artist, venue, date] = concertData;
+        
+          const ticket = {
+            id: ticketIdNumber,
+          event: name,
+          artist: artist,
+          venue: venue,
+          date: new Date(Number(date) * 1000).toISOString().split('T')[0],
+          time: '19:00',
+          type: 'General',
+          price: Number(originalPrice) / 1e18,
+          seatNumber: Number(seatNumber),
+          seatSection: seatSection,
+            qrCode: `QR${ticketIdNumber}`,
+          image: '/api/placeholder/400/250',
+            resellable: !isUsed && Number(transferCount) < 3,
+            purchaseTime: new Date().toISOString(),
+          status: isUsed ? 'used' : 'valid',
+          isUsed: isUsed,
+          transferCount: Number(transferCount)
+          };
+          
+          console.log(`Successfully processed ticket:`, ticket);
+          tickets.push(ticket);
+          
+      } catch (error) {
+          console.error(`Error processing ticket ${ticketId}:`, error);
+      }
+    }
+    
+      console.log(`getUserTickets method returned ${tickets.length} tickets`);
+      if (tickets.length > 0) {
+    return tickets;
+      }
+    } catch (getUserTicketsError) {
+      console.error('contract.getUserTickets failed:', getUserTicketsError);
+    }
+    
+    // 如果 getUserTickets 方法失敗，嘗試直接遍歷方法
+    console.log('Trying direct iteration method...');
+    return await getUserTicketsByDirectIteration(userAddress);
+    
   } catch (error) {
     console.error('Error fetching user tickets:', error);
     return [];
@@ -733,11 +935,50 @@ export async function getResaleOrders(limit = 50, offset = 0) {
 export async function purchaseTicketFromContract(concertId, seatNumber, seatSection, price) {
   try {
     const contract = await getConcertTicketNFTContract();
+    const signer = await getSigner();
+    const userAddress = await signer.getAddress();
     
-    // 調用合約的 purchaseTicket 函數
-    const tx = await contract.purchaseTicket(concertId, seatNumber, seatSection, {
-      value: ethers.parseEther(price.toString())
-    });
+    // 先檢查驗證等級
+    const verificationCheck = await checkUserVerificationForConcert(userAddress, concertId);
+    console.log('Verification check result:', verificationCheck);
+    
+    if (!verificationCheck.canPurchase) {
+      return {
+        success: false,
+        error: verificationCheck.message
+      };
+    }
+    
+    // 檢查 FLT 餘額
+    const fltBalance = await getUserFLTBalance(userAddress);
+    
+    if (fltBalance < price) {
+      return {
+        success: false,
+        error: `Insufficient FLT balance. Required: ${price} FLT, Available: ${fltBalance} FLT`
+      };
+    }
+    
+    // 檢查 FLT 授權額度
+    const contractAddress = await contract.getAddress();
+    const allowance = await getFLTAllowance(userAddress, contractAddress);
+    
+    if (allowance < price) {
+      console.log(`Insufficient FLT allowance. Approving ${price} FLT...`);
+      const approveResult = await approveFLTSpending(contractAddress, price);
+      if (!approveResult.success) {
+        return {
+          success: false,
+          error: `Failed to approve FLT spending: ${approveResult.error}`
+        };
+      }
+      console.log('FLT approval successful:', approveResult.transactionHash);
+    }
+    
+    console.log(`Purchasing ticket with ${price} FLT tokens`);
+    
+    // 調用合約的 purchaseTicket 函數（使用 FLT 支付，不需要 value）
+    const tx = await contract.purchaseTicket(concertId, seatNumber, seatSection);
     
     // 等待交易確認
     const receipt = await tx.wait();
@@ -763,7 +1004,9 @@ export async function purchaseTicketFromContract(concertId, seatNumber, seatSect
       ticketId: ticketId,
       transactionHash: receipt.hash,
       blockNumber: receipt.blockNumber,
-      gasUsed: receipt.gasUsed.toString()
+      gasUsed: receipt.gasUsed.toString(),
+      paymentMethod: 'FLT',
+      fltAmount: price
     };
   } catch (error) {
     console.error('Error purchasing ticket:', error);
@@ -853,6 +1096,403 @@ export async function useTicketForEntry(ticketId) {
   }
 }
 
+/**
+ * 獲取用戶 NFT 數量
+ */
+export async function getUserNFTCount(userAddress) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    const balance = await contract.balanceOf(userAddress);
+    return Number(balance);
+  } catch (error) {
+    console.error('Error fetching user NFT count:', error);
+    return 0;
+  }
+}
+
+/**
+ * 獲取用戶 ETH 餘額
+ */
+export async function getUserETHBalance(userAddress) {
+  try {
+    const provider = getProvider();
+    const balance = await provider.getBalance(userAddress);
+    return parseFloat(ethers.formatEther(balance));
+  } catch (error) {
+    console.error('Error fetching user ETH balance:', error);
+    return 0;
+  }
+}
+
+/**
+ * 直接方法：通過遍歷 token ID 獲取用戶票券（因為合約的 getUserTickets 有 bug）
+ */
+export async function getUserTicketsByDirectIteration(userAddress) {
+  try {
+    console.log(`Direct iteration for user: ${userAddress}`);
+    const contract = await getConcertTicketNFTContract();
+    
+    const tickets = [];
+    const maxTokenId = 100; // 假設不會超過 100 個票券
+    
+    for (let tokenId = 1; tokenId <= maxTokenId; tokenId++) {
+      try {
+        // 檢查這個 token 是否存在以及是否屬於用戶
+        const owner = await contract.ownerOf(tokenId);
+        
+        if (owner.toLowerCase() === userAddress.toLowerCase()) {
+          console.log(`Found owned token: ${tokenId} by ${userAddress}`);
+          
+          // 獲取票券詳情
+          const ticketDetails = await contract.getTicketDetails(tokenId);
+          console.log(`Ticket details for ${tokenId}:`, ticketDetails);
+          
+          const [concertId, seatNumber, seatSection, , , isUsed, transferCount, originalPrice] = ticketDetails;
+          
+          // 獲取演唱會詳情
+          let concertData;
+          try {
+            concertData = await contract.getConcertDetails(Number(concertId));
+            console.log(`Concert details for ${concertId}:`, concertData);
+          } catch (concertError) {
+            console.error(`getConcertDetails(${concertId}) failed:`, concertError);
+            concertData = ['Unknown Concert', 'Unknown Artist', 'Unknown Venue', Math.floor(Date.now() / 1000)];
+          }
+          
+          const [name, artist, venue, date] = concertData;
+          
+          const ticket = {
+            id: tokenId,
+            event: name,
+            artist: artist,
+            venue: venue,
+            date: new Date(Number(date) * 1000).toISOString().split('T')[0],
+            time: '19:00',
+            type: 'General',
+            price: Number(originalPrice) / 1e18,
+            seatNumber: Number(seatNumber),
+            seatSection: seatSection,
+            qrCode: `QR${tokenId}`,
+            image: '/api/placeholder/400/250',
+            resellable: !isUsed && Number(transferCount) < 3,
+            purchaseTime: new Date().toISOString(),
+            status: isUsed ? 'used' : 'valid',
+            isUsed: isUsed,
+            transferCount: Number(transferCount)
+          };
+          
+          console.log(`Successfully created ticket from direct iteration:`, ticket);
+          tickets.push(ticket);
+        }
+        
+      } catch (error) {
+        // Token 不存在或其他錯誤，跳過
+        if (!error.message.includes('ERC721NonexistentToken')) {
+          console.warn(`Error checking token ${tokenId}:`, error);
+        }
+      }
+    }
+    
+    console.log(`Direct iteration found ${tickets.length} tickets`);
+    return tickets;
+    
+  } catch (error) {
+    console.error('Error in direct iteration:', error);
+    return [];
+  }
+}
+
+// ========== FLT 代幣合約交互 ==========
+
+/**
+ * 建立 FLT 代幣合約實例
+ */
+export async function getFLTTokenContract() {
+  try {
+    // 檢查網絡
+    const provider = getProvider();
+    const network = await provider.getNetwork();
+    console.log(`Current network: ${network.name} (${network.chainId})`);
+    
+    if (network.chainId !== 11155111n) { // Sepolia chainId
+      console.warn(`Not on Sepolia network. Current chainId: ${network.chainId}`);
+    }
+    
+    const signer = await getSigner();
+    console.log(`Creating FLT contract with address: ${FLT_TOKEN_ADDRESS}`);
+    
+    const contract = new ethers.Contract(
+      FLT_TOKEN_ADDRESS,
+      FLT_TOKEN_ABI,
+      signer
+    );
+    
+    // 測試合約是否可訪問
+    try {
+      const name = await contract.name();
+      console.log(`FLT Contract name: ${name}`);
+    } catch (contractError) {
+      console.error('Contract may not exist or have issues:', contractError);
+    }
+    
+    return contract;
+  } catch (error) {
+    console.error('Error creating FLT contract:', error);
+    throw error;
+  }
+}
+
+/**
+ * 獲取用戶 FLT 餘額
+ */
+export async function getUserFLTBalance(userAddress) {
+  try {
+    console.log(`Fetching FLT balance for address: ${userAddress}`);
+    console.log(`FLT Contract Address: ${FLT_TOKEN_ADDRESS}`);
+    
+    const contract = await getFLTTokenContract();
+    console.log(`Contract instance created: ${contract.target}`);
+    
+    const balance = await contract.balanceOf(userAddress);
+    console.log(`Raw balance from contract: ${balance.toString()}`);
+    
+    const formattedBalance = parseFloat(ethers.formatEther(balance));
+    console.log(`Formatted FLT balance: ${formattedBalance}`);
+    
+    return formattedBalance;
+  } catch (error) {
+    console.error('Error fetching user FLT balance:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      reason: error.reason,
+      userAddress,
+      contractAddress: FLT_TOKEN_ADDRESS
+    });
+    return 0;
+  }
+}
+
+/**
+ * 發送 FLT 代幣
+ */
+export async function sendFLTTokens(toAddress, amount) {
+  try {
+    const contract = await getFLTTokenContract();
+    const amountInWei = ethers.parseEther(amount.toString());
+    
+    const tx = await contract.transfer(toAddress, amountInWei);
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      transactionHash: receipt.hash,
+      gasUsed: Number(receipt.gasUsed)
+    };
+  } catch (error) {
+    console.error('Error sending FLT tokens:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 授權 FLT 代幣使用（用於購票等）
+ */
+export async function approveFLTSpending(spenderAddress, amount) {
+  try {
+    const contract = await getFLTTokenContract();
+    const amountInWei = ethers.parseEther(amount.toString());
+    
+    const tx = await contract.approve(spenderAddress, amountInWei);
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      transactionHash: receipt.hash
+    };
+  } catch (error) {
+    console.error('Error approving FLT spending:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 檢查 FLT 代幣授權額度
+ */
+export async function getFLTAllowance(ownerAddress, spenderAddress) {
+  try {
+    const contract = await getFLTTokenContract();
+    const allowance = await contract.allowance(ownerAddress, spenderAddress);
+    return parseFloat(ethers.formatEther(allowance));
+  } catch (error) {
+    console.error('Error fetching FLT allowance:', error);
+    return 0;
+  }
+}
+
+/**
+ * 獲取 FLT 代幣基本信息
+ */
+export async function getFLTTokenInfo() {
+  try {
+    const contract = await getFLTTokenContract();
+    
+    const [name, symbol, decimals, totalSupply] = await Promise.all([
+      contract.name(),
+      contract.symbol(),
+      contract.decimals(),
+      contract.totalSupply()
+    ]);
+    
+    return {
+      name,
+      symbol,
+      decimals: Number(decimals),
+      totalSupply: parseFloat(ethers.formatEther(totalSupply))
+    };
+  } catch (error) {
+    console.error('Error fetching FLT token info:', error);
+    return {
+      name: 'FanLoyaltyToken',
+      symbol: 'FLT',
+      decimals: 18,
+      totalSupply: 0
+    };
+  }
+}
+
+// ========== 驗證等級相關函數 ==========
+
+// 驗證註冊表 ABI
+const VERIFICATION_REGISTRY_ABI = [
+  {
+    "type": "function",
+    "name": "verifications",
+    "inputs": [{"name": "", "type": "address", "internalType": "address"}],
+    "outputs": [
+      {"name": "isVerified", "type": "bool", "internalType": "bool"},
+      {"name": "isPhoneVerified", "type": "bool", "internalType": "bool"},
+      {"name": "isBlacklisted", "type": "bool", "internalType": "bool"},
+      {"name": "identityHash", "type": "bytes32", "internalType": "bytes32"},
+      {"name": "verificationTime", "type": "uint256", "internalType": "uint256"},
+      {"name": "level", "type": "uint8", "internalType": "uint8"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVerificationLevel",
+    "inputs": [{"name": "user", "type": "address", "internalType": "address"}],
+    "outputs": [{"name": "", "type": "uint8", "internalType": "uint8"}],
+    "stateMutability": "view"
+  }
+];
+
+/**
+ * 獲取用戶的驗證等級
+ */
+export async function getUserVerificationLevel(userAddress) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    
+    // 獲取驗證註冊表合約地址
+    const verificationRegistryAddress = await contract.verificationRegistry();
+    console.log(`Verification Registry Address: ${verificationRegistryAddress}`);
+    
+    // 如果沒有設置驗證註冊表，返回默認等級 0
+    if (verificationRegistryAddress === '0x0000000000000000000000000000000000000000') {
+      console.log('No verification registry set, returning default level 0');
+      return 0;
+    }
+    
+    // 創建驗證註冊表合約實例
+    const signer = await getSigner();
+    const verificationContract = new ethers.Contract(
+      verificationRegistryAddress,
+      VERIFICATION_REGISTRY_ABI,
+      signer
+    );
+    
+    // 查詢用戶驗證信息
+    const verificationData = await verificationContract.verifications(userAddress);
+    console.log(`Verification data for ${userAddress}:`, verificationData);
+    
+    // 解析驗證數據
+    const [isVerified, isPhoneVerified, isBlacklisted] = verificationData;
+    
+    // 計算驗證等級
+    let calculatedLevel = 0;
+    if (isVerified) calculatedLevel += 1;
+    if (isPhoneVerified) calculatedLevel += 1;
+    if (isBlacklisted) calculatedLevel = 0; // 黑名單用戶等級為 0
+    
+    console.log(`User ${userAddress} verification level: ${calculatedLevel}`);
+    return calculatedLevel;
+    
+  } catch (error) {
+    console.error('Error fetching user verification level:', error);
+    return 0;
+  }
+}
+
+/**
+ * 獲取演唱會的最低驗證等級要求
+ */
+export async function getConcertVerificationRequirement(concertId) {
+  try {
+    const contract = await getConcertTicketNFTContract();
+    const concertData = await contract.concerts(concertId);
+    
+    // concerts 函數返回的結構中，minVerificationLevel 是最後一個參數
+    const minVerificationLevel = concertData[14]; // 根據 ABI，這是第15個參數（索引14）
+    
+    console.log(`Concert ${concertId} requires verification level: ${minVerificationLevel}`);
+    return Number(minVerificationLevel);
+    
+  } catch (error) {
+    console.error('Error fetching concert verification requirement:', error);
+    return 0;
+  }
+}
+
+/**
+ * 檢查用戶是否滿足演唱會的驗證等級要求
+ */
+export async function checkUserVerificationForConcert(userAddress, concertId) {
+  try {
+    const [userLevel, requiredLevel] = await Promise.all([
+      getUserVerificationLevel(userAddress),
+      getConcertVerificationRequirement(concertId)
+    ]);
+    
+    console.log(`User verification check: User level=${userLevel}, Required level=${requiredLevel}`);
+    
+    return {
+      userLevel,
+      requiredLevel,
+      canPurchase: userLevel >= requiredLevel,
+      message: userLevel >= requiredLevel 
+        ? 'Verification level sufficient' 
+        : `Insufficient verification level. Required: ${requiredLevel}, Your level: ${userLevel}`
+    };
+    
+  } catch (error) {
+    console.error('Error checking user verification:', error);
+    return {
+      userLevel: 0,
+      requiredLevel: 0,
+      canPurchase: false,
+      message: 'Error checking verification level'
+    };
+  }
+}
+
 const defaultExport = {
   isMetaMaskInstalled,
   getCurrentChainId,
@@ -882,6 +1522,19 @@ const defaultExport = {
   purchaseTicketFromContract,
   buyResaleTicketFromContract,
   listTicketForSale,
-  useTicketForEntry
+  useTicketForEntry,
+  getUserNFTCount,
+  getUserETHBalance,
+  checkTokenOwnership,
+  getUserTicketsByDirectIteration,
+  getFLTTokenContract,
+  getUserFLTBalance,
+  sendFLTTokens,
+  approveFLTSpending,
+  getFLTAllowance,
+  getFLTTokenInfo,
+  getUserVerificationLevel,
+  getConcertVerificationRequirement,
+  checkUserVerificationForConcert
 };
 export default defaultExport;

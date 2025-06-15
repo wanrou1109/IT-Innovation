@@ -1,5 +1,5 @@
+import { Award, Filter, Flag, Home, RefreshCw, Search, Settings, ShoppingCart, Ticket, User } from 'lucide-react';
 import React from 'react';
-import { Home, Ticket, Award, Flag, User, ShoppingCart, RefreshCw, Search, Filter } from 'lucide-react';
 import '../../styles/components/Sidebar.css';
 
 const Sidebar = ({ 
@@ -14,7 +14,9 @@ const Sidebar = ({
     reportTab,
     setReportTab,
     profileTab,
-    setProfileTab
+    setProfileTab,
+    organizerTab,
+    setOrganizerTab
 }) => {
     const getSidebarContent = () => {
         switch (currentPage) {
@@ -151,6 +153,34 @@ const Sidebar = ({
                 ]
                 };
             
+            case 'organizer':
+                return {
+                title: 'Organizer Dashboard',
+                items: [
+                    { 
+                    id: 'create', 
+                    label: 'Create Concert', 
+                    icon: ShoppingCart,
+                    action: () => setOrganizerTab('create'),
+                    active: organizerTab === 'create'
+                    },
+                    { 
+                    id: 'manage', 
+                    label: 'Manage Concerts', 
+                    icon: Settings,
+                    action: () => setOrganizerTab('manage'),
+                    active: organizerTab === 'manage'
+                    },
+                    { 
+                    id: 'stats', 
+                    label: 'Sales Analytics', 
+                    icon: Award,
+                    action: () => setOrganizerTab('stats'),
+                    active: organizerTab === 'stats'
+                    }
+                ]
+                };
+            
             default:
                 return {
                 title: 'Navigation',
@@ -160,7 +190,8 @@ const Sidebar = ({
                     { id: 'tickets', label: 'My Tickets', icon: Ticket, action: () => setCurrentPage('tickets') },
                     { id: 'nfts', label: 'My NFTs', icon: Award, action: () => setCurrentPage('nfts') },
                     { id: 'report', label: 'Report', icon: Flag, action: () => setCurrentPage('report') },
-                    { id: 'profile', label: 'Profile', icon: User, action: () => setCurrentPage('profile') }
+                    { id: 'profile', label: 'Profile', icon: User, action: () => setCurrentPage('profile') },
+                    { id: 'organizer', label: 'Organizer', icon: Settings, action: () => setCurrentPage('organizer') }
                 ]
                 };
         }

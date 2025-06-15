@@ -1,4 +1,5 @@
-import { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useEffect, useReducer } from 'react';
+import { getFLTTokenInfo, getUserFLTBalance, sendFLTTokens } from '../utils/web3Utils.js';
 
 // FLT 狀態初始值
 const initialState = {
@@ -158,17 +159,17 @@ export const FLTProvider = ({ children }) => {
         dispatch({ type: FLT_ACTIONS.SET_LOADING, payload: true });
         
         try {
-        // 模擬 API 調用 - 之後替換為實際的智能合約查詢
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const mockBalance = 1250; // 模擬餘額
+        // 使用真實的智能合約查詢 FLT 餘額
+        const realBalance = await getUserFLTBalance(address);
+        console.log(`Fetched real FLT balance: ${realBalance} for address: ${address}`);
         
         dispatch({ 
             type: FLT_ACTIONS.SET_BALANCE, 
-            payload: mockBalance 
+            payload: realBalance 
         });
         
         } catch (error) {
+        console.error('Error fetching FLT balance:', error);
         dispatch({ 
             type: FLT_ACTIONS.SET_ERROR, 
             payload: error.message 
@@ -185,8 +186,12 @@ export const FLTProvider = ({ children }) => {
         try {
         dispatch({ type: FLT_ACTIONS.SET_LOADING, payload: true });
         
-        // 模擬轉賬交易 - 之後替換為實際的智能合約調用
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 使用真實的智能合約轉賬
+        const result = await sendFLTTokens(toAddress, amount);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
         
         const transaction = {
             id: Date.now(),
@@ -196,7 +201,7 @@ export const FLTProvider = ({ children }) => {
             purpose: purpose,
             timestamp: new Date(),
             status: 'completed',
-            hash: `0x${Math.random().toString(16).substr(2, 64)}`
+            hash: result.transactionHash
         };
         
         dispatch({ 
@@ -207,6 +212,7 @@ export const FLTProvider = ({ children }) => {
         return transaction;
         
         } catch (error) {
+        console.error('Error sending FLT tokens:', error);
         dispatch({ 
             type: FLT_ACTIONS.SET_ERROR, 
             payload: error.message 
@@ -402,6 +408,23 @@ export const FLTProvider = ({ children }) => {
         };
     }, [state.stakingInfo.totalStaked]);
 
+    // 獲取 FLT 代幣信息
+    const getTokenInfo = async () => {
+        try {
+        const tokenInfo = await getFLTTokenInfo();
+        console.log('FLT Token Info:', tokenInfo);
+        return tokenInfo;
+        } catch (error) {
+        console.error('Error fetching token info:', error);
+        return {
+            name: 'FanLoyaltyToken',
+            symbol: 'FLT',
+            decimals: 18,
+            totalSupply: 0
+        };
+        }
+    };
+
     const value = {
         ...state,
         fetchBalance,
@@ -415,7 +438,8 @@ export const FLTProvider = ({ children }) => {
         convertToETH,
         getTransactionHistory,
         calculateAPY,
-        updateExchangeRate
+        updateExchangeRate,
+        getTokenInfo
     };
 
     return (

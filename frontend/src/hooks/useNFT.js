@@ -1,107 +1,69 @@
-import { createContext, useContext, useReducer, useEffect } from 'react';
-import { mockNFTs, rarityConfig, categoryConfig } from '../data/mockNFTs.js';
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useState } from 'react';
+import { getConcertTicketNFTContract, getUserTickets } from '../utils/web3Utils.js';
+import { useWallet } from './useWallet.js';
 
-// NFT 狀態初始值
 const initialState = {
-    nfts: mockNFTs,
+  nfts: [],
+  selectedNFT: null,
     loading: false,
     error: null,
-    selectedCategory: 'participation',
-    selectedNFT: null,
-    transferModal: {
-        isOpen: false,
-        nft: null
-    }
+  filter: 'all',
+  sortBy: 'date'
 };
 
-// Action 類型
+// Action types
 const NFT_ACTIONS = {
     SET_LOADING: 'SET_LOADING',
+  SET_NFTS: 'SET_NFTS',
     SET_ERROR: 'SET_ERROR',
-    SET_NFTS: 'SET_NFTS',
-    SET_CATEGORY: 'SET_CATEGORY',
     SELECT_NFT: 'SELECT_NFT',
-    TRANSFER_NFT: 'TRANSFER_NFT',
-    OPEN_TRANSFER_MODAL: 'OPEN_TRANSFER_MODAL',
-    CLOSE_TRANSFER_MODAL: 'CLOSE_TRANSFER_MODAL',
-    UPDATE_NFT: 'UPDATE_NFT'
+  SET_FILTER: 'SET_FILTER',
+  SET_SORT: 'SET_SORT',
+  CLEAR_ERROR: 'CLEAR_ERROR'
 };
 
-// Reducer 函數
+// Reducer
 const nftReducer = (state, action) => {
     switch (action.type) {
         case NFT_ACTIONS.SET_LOADING:
         return {
             ...state,
-            loading: action.payload
-        };
-        
+        loading: action.payload,
+        error: action.payload ? null : state.error
+      };
+    case NFT_ACTIONS.SET_NFTS:
+      return {
+        ...state,
+        nfts: action.payload,
+        loading: false,
+        error: null
+      };
         case NFT_ACTIONS.SET_ERROR:
         return {
             ...state,
             error: action.payload,
             loading: false
         };
-        
-        case NFT_ACTIONS.SET_NFTS:
-        return {
-            ...state,
-            nfts: action.payload,
-            loading: false
-        };
-        
-        case NFT_ACTIONS.SET_CATEGORY:
-        return {
-            ...state,
-            selectedCategory: action.payload
-        };
-        
         case NFT_ACTIONS.SELECT_NFT:
         return {
             ...state,
             selectedNFT: action.payload
         };
-        
-        case NFT_ACTIONS.OPEN_TRANSFER_MODAL:
+    case NFT_ACTIONS.SET_FILTER:
         return {
             ...state,
-            transferModal: {
-            isOpen: true,
-            nft: action.payload
-            }
+        filter: action.payload
         };
-        
-        case NFT_ACTIONS.CLOSE_TRANSFER_MODAL:
+    case NFT_ACTIONS.SET_SORT:
         return {
             ...state,
-            transferModal: {
-            isOpen: false,
-            nft: null
-            }
+        sortBy: action.payload
         };
-        
-        case NFT_ACTIONS.TRANSFER_NFT:
-        // 在實際應用中，這裡會調用智能合約
+    case NFT_ACTIONS.CLEAR_ERROR:
         return {
             ...state,
-            transferModal: {
-            isOpen: false,
-            nft: null
-            }
-        };
-        
-        case NFT_ACTIONS.UPDATE_NFT:
-        const { category, nftId, updates } = action.payload;
-        return {
-            ...state,
-            nfts: {
-            ...state.nfts,
-            [category]: state.nfts[category].map(nft =>
-                nft.id === nftId ? { ...nft, ...updates } : nft
-            )
-            }
-        };
-        
+        error: null
+      };
         default:
         return state;
     }
@@ -113,156 +75,172 @@ const NFTContext = createContext();
 // Provider 組件
 export const NFTProvider = ({ children }) => {
     const [state, dispatch] = useReducer(nftReducer, initialState);
+    const [contract, setContract] = useState(null);
+    const { isConnected, walletInfo } = useWallet();
 
-    // 獲取 NFT 收藏
-    const fetchNFTs = async () => {
+    // 初始化合約實例
+    useEffect(() => {
+        const initContract = async () => {
+            if (isConnected && walletInfo?.address) {
+                try {
+                    const contractInstance = await getConcertTicketNFTContract();
+                    setContract(contractInstance);
+                    console.log('合約實例已初始化:', contractInstance);
+                } catch (error) {
+                    console.error('初始化合約失敗:', error);
+                    setContract(null);
+                }
+            } else {
+                setContract(null);
+            }
+        };
+
+        initContract();
+    }, [isConnected, walletInfo?.address]);
+
+  // 載入用戶 NFT
+  const loadNFTs = useCallback(async () => {
+    if (!isConnected || !walletInfo?.address) {
+      dispatch({ type: NFT_ACTIONS.SET_NFTS, payload: [] });
+      return;
+    }
+
         dispatch({ type: NFT_ACTIONS.SET_LOADING, payload: true });
         
         try {
-        // 模擬 API 調用 - 之後替換為實際的區塊鏈查詢
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        dispatch({ 
-            type: NFT_ACTIONS.SET_NFTS, 
-            payload: mockNFTs 
-        });
-        
+      // 從區塊鏈獲取用戶的票券 NFT
+      const tickets = await getUserTickets(walletInfo.address);
+      
+      // 將票券轉換為 NFT 格式
+      const nfts = tickets.map(ticket => ({
+        id: ticket.id,
+        name: `${ticket.event} - ${ticket.type}`,
+        artist: ticket.artist,
+        event: ticket.event,
+        image: ticket.image || '/api/placeholder/300/200',
+        rarity: ticket.isUsed ? 'Used' : 'Valid',
+        category: ticket.type.toLowerCase(),
+        date: ticket.date,
+        venue: ticket.venue,
+        seatNumber: ticket.seatNumber,
+        seatSection: ticket.seatSection,
+        price: ticket.price,
+        isUsed: ticket.isUsed,
+        transferCount: ticket.transferCount,
+        resellable: ticket.resellable,
+        status: ticket.status,
+        purchaseTime: ticket.purchaseTime,
+        qrCode: ticket.qrCode
+      }));
+
+      dispatch({ type: NFT_ACTIONS.SET_NFTS, payload: nfts });
         } catch (error) {
+      console.error('Error loading NFTs from blockchain:', error);
         dispatch({ 
             type: NFT_ACTIONS.SET_ERROR, 
-            payload: error.message 
-        });
-        }
-    };
+        payload: 'Failed to load NFTs from blockchain' 
+      });
+    }
+  }, [isConnected, walletInfo?.address]);
 
-    // 設置當前分類
-    const setCategory = (category) => {
-        dispatch({ 
-        type: NFT_ACTIONS.SET_CATEGORY, 
-        payload: category 
-        });
-    };
+  // 監聽錢包連接狀態變化
+  useEffect(() => {
+    loadNFTs();
+  }, [loadNFTs]);
 
     // 選擇 NFT
     const selectNFT = (nft) => {
-        dispatch({ 
-        type: NFT_ACTIONS.SELECT_NFT, 
-        payload: nft 
-        });
-    };
+    dispatch({ type: NFT_ACTIONS.SELECT_NFT, payload: nft });
+  };
 
-    // 打開轉移模態框
-    const openTransferModal = (nft) => {
-        if (!nft.transferable) {
-        alert('This NFT is not transferable');
-        return;
-        }
-        
-        dispatch({ 
-        type: NFT_ACTIONS.OPEN_TRANSFER_MODAL, 
-        payload: nft 
-        });
-    };
+  // 設置篩選器
+  const setFilter = (filter) => {
+    dispatch({ type: NFT_ACTIONS.SET_FILTER, payload: filter });
+  };
 
-    // 關閉轉移模態框
-    const closeTransferModal = () => {
-        dispatch({ type: NFT_ACTIONS.CLOSE_TRANSFER_MODAL });
-    };
+  // 設置排序方式
+  const setSortBy = (sortBy) => {
+    dispatch({ type: NFT_ACTIONS.SET_SORT, payload: sortBy });
+  };
 
-    // 轉移 NFT
-    const transferNFT = async (nft, toAddress) => {
-        try {
-        dispatch({ type: NFT_ACTIONS.SET_LOADING, payload: true });
-        
-        // 模擬轉移交易 - 之後替換為實際的智能合約調用
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        console.log(`Transferring NFT ${nft.id} to ${toAddress}`);
-        
-        dispatch({ type: NFT_ACTIONS.TRANSFER_NFT });
-        
-        // 可選：從本地收藏中移除 NFT
-        // 或者更新 NFT 狀態
-        
-        return true;
-        
-        } catch (error) {
-        dispatch({ 
-            type: NFT_ACTIONS.SET_ERROR, 
-            payload: error.message 
-        });
-        return false;
-        }
-    };
+  // 清除錯誤
+  const clearError = () => {
+    dispatch({ type: NFT_ACTIONS.CLEAR_ERROR });
+  };
 
-    // 獲取 NFT 稀有度樣式
-    const getRarityStyle = (rarity) => {
-        return rarityConfig[rarity] || rarityConfig.Common;
-    };
+  // 獲取篩選後的 NFT
+  const getFilteredNFTs = () => {
+    let filtered = [...state.nfts];
 
-    // 獲取分類信息
-    const getCategoryInfo = (category) => {
-        return categoryConfig[category];
-    };
+    // 應用篩選器
+    if (state.filter !== 'all') {
+      filtered = filtered.filter(nft => nft.category === state.filter);
+    }
 
-    // 獲取 NFT 總數
-    const getTotalNFTCount = () => {
-        return Object.values(state.nfts).reduce((total, categoryNFTs) => {
-        return total + categoryNFTs.length;
-        }, 0);
-    };
+    // 應用排序
+    filtered.sort((a, b) => {
+      switch (state.sortBy) {
+        case 'date':
+          return new Date(b.date) - new Date(a.date);
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'price':
+          return b.price - a.price;
+        case 'rarity':
+          const rarityOrder = { 'Valid': 1, 'Used': 0 };
+          return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
+        default:
+          return 0;
+      }
+    });
 
-    // 獲取分類 NFT 數量
-    const getCategoryCount = (category) => {
-        return state.nfts[category]?.length || 0;
-    };
+    return filtered;
+  };
 
-    // 按稀有度篩選 NFT
-    const filterByRarity = (category, rarity) => {
-        return state.nfts[category]?.filter(nft => nft.rarity === rarity) || [];
+  // 獲取 NFT 統計
+  const getNFTStats = () => {
+    const total = state.nfts.length;
+    const categories = {};
+    const rarities = {};
+
+    state.nfts.forEach(nft => {
+      categories[nft.category] = (categories[nft.category] || 0) + 1;
+      rarities[nft.rarity] = (rarities[nft.rarity] || 0) + 1;
+    });
+
+    return {
+      total,
+      categories,
+      rarities
+    };
     };
 
     // 搜索 NFT
     const searchNFTs = (query) => {
-        const results = {};
-        
-        Object.keys(state.nfts).forEach(category => {
-        results[category] = state.nfts[category].filter(nft =>
+    return state.nfts.filter(nft =>
             nft.name.toLowerCase().includes(query.toLowerCase()) ||
             nft.artist?.toLowerCase().includes(query.toLowerCase()) ||
             nft.event?.toLowerCase().includes(query.toLowerCase())
         );
-        });
-        
-        return results;
     };
 
     // 獲取最近的 NFT
     const getRecentNFTs = (limit = 5) => {
-        const allNFTs = Object.values(state.nfts).flat();
-        return allNFTs
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
+    return [...state.nfts]
+      .sort((a, b) => new Date(b.purchaseTime) - new Date(a.purchaseTime))
         .slice(0, limit);
     };
 
-    // 組件掛載時獲取 NFT
-    useEffect(() => {
-        fetchNFTs();
-    }, []);
-
     const value = {
         ...state,
-        fetchNFTs,
-        setCategory,
+        contract,
+    loadNFTs,
         selectNFT,
-        openTransferModal,
-        closeTransferModal,
-        transferNFT,
-        getRarityStyle,
-        getCategoryInfo,
-        getTotalNFTCount,
-        getCategoryCount,
-        filterByRarity,
+    setFilter,
+    setSortBy,
+    clearError,
+    getFilteredNFTs,
+    getNFTStats,
         searchNFTs,
         getRecentNFTs
     };

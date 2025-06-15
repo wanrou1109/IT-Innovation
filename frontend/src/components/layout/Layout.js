@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
+import '../../styles/components/Layout.css';
 import Sidebar from './Sidebar.js';
 import TopBar from './Topbar.js';
-import '../../styles/components/Layout.css';
 
 const Layout = ({ children, currentPage, setCurrentPage }) => {
   const [homeMarketType, setHomeMarketType] = useState('primary');
@@ -9,6 +9,7 @@ const Layout = ({ children, currentPage, setCurrentPage }) => {
   const [nftsCategory, setNftsCategory] = useState('participation');
   const [reportTab, setReportTab] = useState('submit');
   const [profileTab, setProfileTab] = useState('dashboard');
+  const [organizerTab, setOrganizerTab] = useState('create');
 
   const enhancedChildren = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
@@ -22,7 +23,9 @@ const Layout = ({ children, currentPage, setCurrentPage }) => {
         // Report 
         reportTab, setReportTab,
         // Profile 
-        profileTab, setProfileTab
+        profileTab, setProfileTab,
+        // Organizer
+        organizerTab, setOrganizerTab
       });
     }
     return child;
@@ -43,6 +46,8 @@ const Layout = ({ children, currentPage, setCurrentPage }) => {
         setReportTab={setReportTab}
         profileTab={profileTab}
         setProfileTab={setProfileTab}
+        organizerTab={organizerTab}
+        setOrganizerTab={setOrganizerTab}
       />
       <div className="main-content">
         <TopBar currentPage={currentPage} setCurrentPage={setCurrentPage} />

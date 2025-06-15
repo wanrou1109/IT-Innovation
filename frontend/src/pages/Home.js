@@ -298,7 +298,7 @@ const Home = ({ homeMarketType = 'primary', setCurrentPage, setReportTarget }) =
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmPurchase}
                     purchasing={purchasing}
-                    userBalance={walletInfo?.balance || 0}
+                    userBalance={walletInfo?.fltBalance || 0}
                     purchaseResult={purchaseResult}
                 />
             )}

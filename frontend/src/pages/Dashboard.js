@@ -1,7 +1,8 @@
 import React from 'react';
-import { useWallet } from '../hooks/useWallet.js';
 import Card from '../components/ui/Card.js';
+import { useWallet } from '../hooks/useWallet.js';
 import '../styles/pages/Dashboard.css';
+import { checkUserVerificationForConcert, getConcertVerificationRequirement, getUserVerificationLevel } from '../utils/web3Utils.js';
 
 const Dashboard = () => {
     const { walletInfo, isConnected } = useWallet();
@@ -18,6 +19,41 @@ const Dashboard = () => {
 
     const experiencePercentage = (userStats.experience / userStats.maxExperience) * 100;
     const milestonePercentage = userStats.milestoneProgress;
+
+    // 驗證等級調試功能
+    const handleVerificationDebug = async () => {
+        if (walletInfo.address) {
+            try {
+                console.log('=== Verification Debug Start ===');
+                
+                // 檢查用戶驗證等級
+                const userLevel = await getUserVerificationLevel(walletInfo.address);
+                console.log(`User verification level: ${userLevel}`);
+                
+                // 檢查演唱會要求
+                const concertRequirement = await getConcertVerificationRequirement(1);
+                console.log(`Concert 1 requirement: ${concertRequirement}`);
+                
+                // 檢查是否可以購買
+                const verificationCheck = await checkUserVerificationForConcert(walletInfo.address, 1);
+                console.log('Verification check result:', verificationCheck);
+                
+                alert(`驗證調試完成！
+用戶等級: ${userLevel}
+演唱會要求: ${concertRequirement}
+可以購買: ${verificationCheck.canPurchase}
+訊息: ${verificationCheck.message}
+請查看控制台獲取詳細信息。`);
+                
+                console.log('=== Verification Debug End ===');
+            } catch (error) {
+                console.error('Verification debug error:', error);
+                alert(`驗證調試失敗: ${error.message}`);
+            }
+        } else {
+            alert('請先連接錢包');
+        }
+    };
 
     if (!isConnected) {
         return (
@@ -37,6 +73,20 @@ const Dashboard = () => {
         <div className="dashboard">
         <div className="dashboard-header">
             <h1>Personal Dashboard</h1>
+            <button 
+                onClick={handleVerificationDebug}
+                style={{
+                    marginLeft: '20px',
+                    padding: '10px 20px',
+                    backgroundColor: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                }}
+            >
+                Debug 驗證等級
+            </button>
         </div>
 
         {/* Stats Grid */}

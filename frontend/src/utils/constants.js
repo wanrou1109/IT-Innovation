@@ -21,8 +21,9 @@ export const NETWORK_CONFIG = {
 
 // 智能合約地址 (Sepolia 測試網)
 export const CONTRACT_ADDRESSES = {
-  NFT_CONTRACT: '0x1dd853b859e67308803B9086D2Eb3f5c46CcFA95', // ConcertTicketNFT
+  NFT_CONTRACT: '0xfd93FA717705550de29760ec2E1D2f3e2FD4261E', // ConcertTicketNFT (FLT支付版本)
   VERIFICATION_REGISTRY: '0x177C3245afd85cD9b6a4372DcbdA583fE4EC57d4', // VerificationRegistry
+  FLT_TOKEN: '0x8fAC18B399599c92C650DbbeeceC9885DEf08aDE', // FLT Token
 };
 
 // FLT 代幣配置

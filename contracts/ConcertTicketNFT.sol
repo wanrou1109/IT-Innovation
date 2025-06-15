@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -19,6 +20,7 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
     uint256 private _concertIdCounter;
 
     VerificationRegistry public verificationRegistry;
+    IERC20 public fltToken;
 
     // 演出結構（優化版）
     struct Concert {
@@ -119,8 +121,9 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
         _;
     }
 
-    constructor(address _verificationRegistry) ERC721("Concert Ticket NFT", "CTN") Ownable(msg.sender) {
+    constructor(address _verificationRegistry, address _fltToken) ERC721("Concert Ticket NFT", "CTN") Ownable(msg.sender) {
         verificationRegistry = VerificationRegistry(_verificationRegistry);
+        fltToken = IERC20(_fltToken);
     }
 
     // =================
@@ -197,14 +200,12 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
 
     function purchaseTicket(uint256 concertId, uint256 seatNumber, string memory seatSection)
         external
-        payable
         nonReentrant
         whenNotPaused
         validConcert(concertId)
         notBlacklisted
     {
         Concert storage concert = concerts[concertId];
-        require(msg.value >= concert.originalPrice, "Insufficient payment");
         require(concert.soldTickets < concert.totalTickets, "Sold out");
 
         // 驗證等級檢查
@@ -221,6 +222,13 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
         // 購買限制檢查
         _checkPurchaseLimits(concertId, msg.sender);
 
+        // FLT 代幣支付
+        require(fltToken.balanceOf(msg.sender) >= concert.originalPrice, "Insufficient FLT balance");
+        require(fltToken.allowance(msg.sender, address(this)) >= concert.originalPrice, "Insufficient FLT allowance");
+        
+        // 轉移 FLT 代幣到合約
+        require(fltToken.transferFrom(msg.sender, address(this), concert.originalPrice), "FLT transfer failed");
+
         // 鑄造票券
         uint256 ticketId = _mintTicket(concertId, seatNumber, seatSection, msg.sender);
 
@@ -236,12 +244,11 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
             identityPurchaseCount[concertId][verification.identityHash]++;
         }
 
-        // 轉帳給主辦方（扣除平台費用）
-        uint256 platformFee = (msg.value * PLATFORM_FEE) / 10000;
-        uint256 organizerAmount = msg.value - platformFee;
+        // 分配 FLT 代幣給主辦方（扣除平台費用）
+        uint256 platformFee = (concert.originalPrice * PLATFORM_FEE) / 10000;
+        uint256 organizerAmount = concert.originalPrice - platformFee;
 
-        (bool success,) = payable(concert.organizer).call{value: organizerAmount}("");
-        require(success, "Transfer to organizer failed");
+        require(fltToken.transfer(concert.organizer, organizerAmount), "Transfer to organizer failed");
 
         emit TicketMinted(ticketId, concertId, msg.sender, seatNumber, seatSection);
     }
@@ -338,11 +345,10 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
         emit TicketListed(orderId, ticketId, price, msg.sender);
     }
 
-    function buyResaleTicket(uint256 orderId) external payable nonReentrant whenNotPaused notBlacklisted {
+    function buyResaleTicket(uint256 orderId) external nonReentrant whenNotPaused notBlacklisted {
         ResaleOrder storage order = resaleOrders[orderId];
         require(order.isActive, "Order not active");
         require(block.timestamp <= order.deadline, "Order expired");
-        require(msg.value >= order.price, "Insufficient payment");
 
         Ticket storage ticket = tickets[order.ticketId];
         require(!ticket.isUsed, "Ticket already used");
@@ -350,23 +356,29 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
         address seller = order.seller;
         require(seller != msg.sender, "Cannot buy own ticket");
 
+        // FLT 代幣支付檢查
+        require(fltToken.balanceOf(msg.sender) >= order.price, "Insufficient FLT balance");
+        require(fltToken.allowance(msg.sender, address(this)) >= order.price, "Insufficient FLT allowance");
+        
+        // 轉移 FLT 代幣到合約
+        require(fltToken.transferFrom(msg.sender, address(this), order.price), "FLT transfer failed");
+
         // 轉移票券
         _transfer(seller, msg.sender, order.ticketId);
 
         // 更新票券狀態
         ticket.transferCount++;
 
-        // 分配收益
-        uint256 platformFee = (msg.value * PLATFORM_FEE) / 10000;
-        uint256 sellerAmount = msg.value - platformFee;
+        // 分配 FLT 收益
+        uint256 platformFee = (order.price * PLATFORM_FEE) / 10000;
+        uint256 sellerAmount = order.price - platformFee;
 
-        (bool success,) = payable(seller).call{value: sellerAmount}("");
-        require(success, "Transfer to seller failed");
+        require(fltToken.transfer(seller, sellerAmount), "Transfer to seller failed");
 
         // 關閉訂單
         order.isActive = false;
 
-        emit TicketSold(orderId, order.ticketId, msg.sender, msg.value);
+        emit TicketSold(orderId, order.ticketId, msg.sender, order.price);
     }
 
     function cancelResaleOrder(uint256 orderId) external {
@@ -559,17 +571,26 @@ contract ConcertTicketNFT is ERC721URIStorage, Ownable, ReentrancyGuard, Pausabl
         Concert memory concert = concerts[concertId];
         require(concert.date + 30 days < block.timestamp, "Can only withdraw 30 days after concert");
 
-        uint256 amount = address(this).balance;
-        (bool success,) = payable(concert.organizer).call{value: amount}("");
-        require(success, "Emergency withdrawal failed");
+        uint256 ethAmount = address(this).balance;
+        if (ethAmount > 0) {
+            (bool success,) = payable(concert.organizer).call{value: ethAmount}("");
+            require(success, "Emergency ETH withdrawal failed");
+        }
 
-        emit EmergencyWithdrawal(concert.organizer, amount);
+        emit EmergencyWithdrawal(concert.organizer, ethAmount);
     }
 
     function withdrawPlatformFees() external onlyOwner {
-        uint256 amount = address(this).balance;
-        (bool success,) = payable(owner()).call{value: amount}("");
-        require(success, "Platform fee withdrawal failed");
+        uint256 fltAmount = fltToken.balanceOf(address(this));
+        if (fltAmount > 0) {
+            require(fltToken.transfer(owner(), fltAmount), "Platform FLT fee withdrawal failed");
+        }
+
+        uint256 ethAmount = address(this).balance;
+        if (ethAmount > 0) {
+            (bool success,) = payable(owner()).call{value: ethAmount}("");
+            require(success, "Platform ETH fee withdrawal failed");
+        }
     }
 
     function pause() external onlyOwner {

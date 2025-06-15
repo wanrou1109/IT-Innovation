@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
+import { getUserETHBalance, getUserFLTBalance, getUserNFTCount } from '../utils/web3Utils.js';
 
 // 錢包狀態初始值
 const initialState = {
@@ -107,35 +108,166 @@ export const WalletProvider = ({ children }) => {
   const [state, dispatch] = useReducer(walletReducer, initialState);
 
   // 連接錢包
-  const connectWallet = async () => {
+  const connectWallet = useCallback(async () => {
+    try {
+      if (!window.ethereum) {
+        throw new Error('MetaMask is not installed');
+      }
+
     dispatch({ type: WALLET_ACTIONS.CONNECT_START });
     
-    try {
-      // 模擬錢包連接 - 之後替換為實際的 Web3 連接邏輯
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 請求連接錢包
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
       
-      const mockWalletInfo = {
-        name: "Hoonie's Wallet",
-        address: "0x742d35Cc6C907C38d39F65d46F8B1234567890Ab",
-        fltBalance: 1250,
-        ethBalance: 0.05,
-        nftCount: 10
+      if (accounts.length === 0) {
+        throw new Error('No accounts found');
+      }
+      
+      const address = accounts[0];
+      
+      // 獲取真實的 ETH 餘額
+      let ethBalance = 0;
+      try {
+        ethBalance = await getUserETHBalance(address);
+      } catch (error) {
+        console.warn('Could not fetch ETH balance:', error);
+      }
+      
+      // 檢查是否在 Sepolia 網絡 (chainId: 0xaa36a7 = 11155111)
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      
+      // 檢查是否在 Sepolia 網絡 (chainId: 0xaa36a7 = 11155111)
+      if (chainId !== '0xaa36a7') {
+        // 嘗試切換到 Sepolia
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0xaa36a7' }],
+          });
+        } catch (switchError) {
+          // 如果網絡不存在，添加 Sepolia 網絡
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia test network',
+                rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+                nativeCurrency: {
+                  name: 'Sepolia ETH',
+                  symbol: 'ETH',
+                  decimals: 18
+                }
+              }],
+            });
+          } else {
+            throw switchError;
+          }
+        }
+      }
+
+      // 獲取真實的 NFT 數量
+      let nftCount = 0;
+      try {
+        nftCount = await getUserNFTCount(address);
+      } catch (error) {
+        console.warn('Could not fetch NFT count:', error);
+      }
+
+      // 獲取真實的 FLT 餘額
+      let fltBalance = 0;
+      try {
+        fltBalance = await getUserFLTBalance(address);
+        console.log(`Real FLT balance for ${address}: ${fltBalance}`);
+      } catch (error) {
+        console.error('Could not fetch FLT balance:', error);
+        console.error('FLT balance fetch error details:', {
+          error: error.message,
+          address,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const walletInfo = {
+        name: "MetaMask Wallet",
+        address: address,
+        fltBalance: fltBalance, // 使用真實的 FLT 餘額
+        ethBalance: parseFloat(ethBalance.toFixed(6)),
+        nftCount: nftCount // 使用真實的 NFT 數量
       };
       
       dispatch({ 
         type: WALLET_ACTIONS.CONNECT_SUCCESS, 
-        payload: mockWalletInfo 
+        payload: walletInfo 
       });
       
       // 存儲到 localStorage
       localStorage.setItem('walletConnected', 'true');
-      localStorage.setItem('walletInfo', JSON.stringify(mockWalletInfo));
+      localStorage.setItem('walletInfo', JSON.stringify(walletInfo));
+      
+      // 設置事件監聽器
+      setupEventListeners();
       
     } catch (error) {
+      console.error('Error connecting wallet:', error);
       dispatch({ 
         type: WALLET_ACTIONS.CONNECT_ERROR, 
         payload: error.message 
       });
+      throw error;
+    }
+  }, []);
+
+  // 設置事件監聽器
+  const setupEventListeners = useCallback(() => {
+    if (typeof window.ethereum !== 'undefined') {
+      // 監聽帳戶變更
+      const handleAccountsChanged = (accounts) => {
+        if (accounts.length === 0) {
+          // 清除狀態並刷新頁面
+          localStorage.removeItem('walletConnected');
+          localStorage.removeItem('walletInfo');
+          window.location.reload();
+        } else {
+          // 刷新頁面以重新連接新帳戶
+          window.location.reload();
+        }
+      };
+
+      // 監聽網絡變更
+      const handleChainChanged = (chainId) => {
+        // 刷新頁面以重新初始化連接
+        window.location.reload();
+      };
+
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
+
+      // 返回清理函數
+      return () => {
+        if (window.ethereum) {
+          window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+          window.ethereum.removeListener('chainChanged', handleChainChanged);
+        }
+      };
+    }
+  }, []);
+
+  // 檢查 MetaMask 連接狀態
+  const checkMetaMaskConnection = async () => {
+    try {
+      if (typeof window.ethereum === 'undefined') {
+        return false;
+      }
+
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      return accounts.length > 0;
+    } catch (error) {
+      console.error('Error checking MetaMask connection:', error);
+      return false;
     }
   };
 
@@ -163,20 +295,28 @@ export const WalletProvider = ({ children }) => {
     localStorage.setItem('walletInfo', JSON.stringify(updatedWalletInfo));
   };
 
-  // 更新 NFT 數量
-  const updateNFTCount = (count) => {
+  // 更新 NFT 數量 - 從區塊鏈獲取真實數據
+  const updateNFTCount = async (address = null) => {
+    const userAddress = address || state.walletInfo.address;
+    if (!userAddress) return;
+    
+    try {
+      const realNFTCount = await getUserNFTCount(userAddress);
     dispatch({ 
       type: WALLET_ACTIONS.UPDATE_NFT_COUNT, 
-      payload: count 
+        payload: realNFTCount 
     });
     
     // 更新 localStorage
     const currentWalletInfo = JSON.parse(localStorage.getItem('walletInfo') || '{}');
     const updatedWalletInfo = {
       ...currentWalletInfo,
-      nftCount: count
+        nftCount: realNFTCount
     };
     localStorage.setItem('walletInfo', JSON.stringify(updatedWalletInfo));
+    } catch (error) {
+      console.warn('Could not update NFT count:', error);
+    }
   };
 
   // 添加交易記錄
@@ -349,36 +489,104 @@ export const WalletProvider = ({ children }) => {
     dispatch({ type: WALLET_ACTIONS.CONNECT_ERROR, payload: null });
   };
 
-  // 組件掛載時檢查本地存儲
+  // 組件掛載時檢查 MetaMask 連接狀態
   useEffect(() => {
+    const initializeWallet = async () => {
     const isConnected = localStorage.getItem('walletConnected');
     const walletInfo = localStorage.getItem('walletInfo');
     
-    if (isConnected && walletInfo) {
+      // 檢查 MetaMask 是否真的連接
+      const isMetaMaskConnected = await checkMetaMaskConnection();
+      
+      if (isConnected && walletInfo && isMetaMaskConnected) {
+        // 更新真實的錢包信息
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts.length > 0) {
+            const address = accounts[0];
+            const balanceWei = await window.ethereum.request({
+              method: 'eth_getBalance',
+              params: [address, 'latest']
+            });
+            const ethBalance = parseInt(balanceWei, 16) / Math.pow(10, 18);
+            
+            // 獲取真實的 NFT 數量
+            let nftCount = 0;
+            try {
+              nftCount = await getUserNFTCount(address);
+            } catch (error) {
+              console.warn('Could not fetch NFT count:', error);
+            }
+            
+            const updatedWalletInfo = {
+              ...JSON.parse(walletInfo),
+              address: address,
+              ethBalance: parseFloat(ethBalance.toFixed(6)),
+              nftCount: nftCount // 使用真實的 NFT 數量
+            };
+            
       dispatch({ 
         type: WALLET_ACTIONS.CONNECT_SUCCESS, 
-        payload: JSON.parse(walletInfo) 
-      });
-    }
-  }, []);
-
-  // 定時更新餘額（模擬）
-  useEffect(() => {
-    if (state.isConnected) {
-      const interval = setInterval(() => {
-        // 模擬小幅餘額變動（如質押獎勵）
-        const currentBalance = state.walletInfo.fltBalance;
-        const randomChange = (Math.random() - 0.5) * 0.1; // ±0.05 FLT
-        const newBalance = Math.max(0, currentBalance + randomChange);
-        
-        if (Math.abs(randomChange) > 0.01) { // 只有變動超過 0.01 FLT 才更新
-          updateBalance(newBalance, state.walletInfo.ethBalance);
+              payload: updatedWalletInfo 
+            });
+            
+            // 更新 localStorage
+            localStorage.setItem('walletInfo', JSON.stringify(updatedWalletInfo));
+            
+            // 設置事件監聽器
+            setupEventListeners();
+          }
+        } catch (error) {
+          console.warn('Could not update wallet info:', error);
         }
-      }, 30000); // 每30秒檢查一次
+      }
+    };
+
+    initializeWallet();
+  }, []); // 空依賴數組，只在組件掛載時執行一次
+
+  // 定期更新真實餘額和 NFT 數量
+  useEffect(() => {
+    if (state.isConnected && state.walletInfo.address) {
+      const updateRealBalances = async () => {
+        try {
+          // 獲取真實的 ETH 餘額
+          const realETHBalance = await getUserETHBalance(state.walletInfo.address);
+          
+          // 獲取真實的 NFT 數量
+          const realNFTCount = await getUserNFTCount(state.walletInfo.address);
+          
+          // 獲取真實的 FLT 餘額
+          const realFLTBalance = await getUserFLTBalance(state.walletInfo.address);
+          console.log(`Periodic FLT balance update: Current=${state.walletInfo.fltBalance}, Real=${realFLTBalance}`);
+          
+          // 只更新實際變化的數據
+          if (Math.abs(realETHBalance - state.walletInfo.ethBalance) > 0.0001 ||
+              Math.abs(realFLTBalance - state.walletInfo.fltBalance) > 0.01) {
+            console.log(`Updating balances: FLT ${state.walletInfo.fltBalance} -> ${realFLTBalance}, ETH ${state.walletInfo.ethBalance} -> ${realETHBalance}`);
+            updateBalance(realFLTBalance, realETHBalance);
+          }
+          
+          if (realNFTCount !== state.walletInfo.nftCount) {
+            dispatch({ 
+              type: WALLET_ACTIONS.UPDATE_NFT_COUNT, 
+              payload: realNFTCount 
+            });
+          }
+        } catch (error) {
+          console.warn('Could not update balances:', error);
+        }
+      };
+
+      // 立即更新一次
+      updateRealBalances();
+      
+      // 每30秒更新一次
+      const interval = setInterval(updateRealBalances, 30000);
       
       return () => clearInterval(interval);
     }
-  }, [state.isConnected, state.walletInfo.fltBalance]);
+  }, [state.isConnected, state.walletInfo.address, state.walletInfo.ethBalance, state.walletInfo.fltBalance, state.walletInfo.nftCount]);
 
   const value = {
     ...state,
@@ -396,7 +604,8 @@ export const WalletProvider = ({ children }) => {
     getPurchaseHistory,
     isValidAddress,
     getWalletStatus,
-    clearError
+    clearError,
+    checkMetaMaskConnection
   };
 
   return (

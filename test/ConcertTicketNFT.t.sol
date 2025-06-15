@@ -4,16 +4,30 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {VerificationRegistry} from "../contracts/VerificationRegistry.sol";
 import {ConcertTicketNFT} from "../contracts/ConcertTicketNFT.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+// Mock FLT Token for testing
+contract MockFLTToken is ERC20 {
+    constructor() ERC20("FLT Token", "FLT") {
+        // Mint initial supply to deployer
+        _mint(msg.sender, 1000000 * 10**18);
+    }
+    
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 contract ConcertTicketNFTTest is Test {
     VerificationRegistry public verificationRegistry;
     ConcertTicketNFT public concertTicketNFT;
+    MockFLTToken public fltToken;
     address public owner;
     address public organizer;
     address public buyer1;
     address public buyer2;
     uint256 public CONCERT_DATE;
-    uint256 public constant TICKET_PRICE = 1 ether;
+    uint256 public constant TICKET_PRICE = 1000 * 10**18; // 1000 FLT tokens
     uint256 public constant TOTAL_TICKETS = 100;
     bytes32 public constant IDENTITY_HASH_1 = keccak256("identity1");
     bytes32 public constant IDENTITY_HASH_2 = keccak256("identity2");
@@ -24,11 +38,18 @@ contract ConcertTicketNFTTest is Test {
         organizer = makeAddr("organizer");
         buyer1 = makeAddr("buyer1");
         buyer2 = makeAddr("buyer2");
-        vm.deal(buyer1, 10 ether);
-        vm.deal(buyer2, 10 ether);
-        vm.deal(organizer, 5 ether);
+        
+        // Deploy FLT token first
+        fltToken = new MockFLTToken();
+        
+        // Deploy contracts
         verificationRegistry = new VerificationRegistry();
-        concertTicketNFT = new ConcertTicketNFT(address(verificationRegistry));
+        concertTicketNFT = new ConcertTicketNFT(address(verificationRegistry), address(fltToken));
+        
+        // Mint FLT tokens to test users
+        fltToken.mint(buyer1, 10000 * 10**18);
+        fltToken.mint(buyer2, 10000 * 10**18);
+        fltToken.mint(organizer, 5000 * 10**18);
     }
 
     // ========== Concert Management Tests ==========
@@ -106,9 +127,13 @@ contract ConcertTicketNFTTest is Test {
         // Warp time to avoid purchase interval restriction
         vm.warp(block.timestamp + 1 hours + 1);
 
+        // Approve FLT tokens for purchase
+        vm.prank(buyer1);
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+
         // Purchase ticket
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(
+        concertTicketNFT.purchaseTicket(
             concertId,
             1, // seat number
             "A" // seat section
@@ -157,13 +182,17 @@ contract ConcertTicketNFTTest is Test {
         // Only verify phone for buyer1
         verificationRegistry.verifyUser(buyer1, true, false, false, IDENTITY_HASH_1);
 
+        // Approve FLT tokens
+        vm.prank(buyer1);
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+
         // Should fail to purchase
         vm.prank(buyer1);
         vm.expectRevert("Insufficient verification level");
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 1, "A");
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
     }
 
-    function test_PurchaseTicket_InsufficientPayment() public {
+    function test_PurchaseTicket_InsufficientFLTBalance() public {
         verificationRegistry.verifyUser(buyer1, true, false, false, IDENTITY_HASH_1);
 
         vm.prank(organizer);
@@ -171,9 +200,44 @@ contract ConcertTicketNFTTest is Test {
             "Test Concert", "Test Artist", "Test Venue", CONCERT_DATE, TOTAL_TICKETS, TICKET_PRICE, 1 hours, false, 1
         );
 
+        // Set a specific time to ensure we're past the purchase interval
+        vm.warp(1000000); // Set to a specific timestamp
+        
+        // Get buyer1's current balance and transfer it all away
+        uint256 buyer1Balance = fltToken.balanceOf(buyer1);
         vm.prank(buyer1);
-        vm.expectRevert("Insufficient payment");
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE - 1}(concertId, 1, "A");
+        fltToken.transfer(buyer2, buyer1Balance);
+
+        // Verify buyer1 has 0 FLT balance
+        assertEq(fltToken.balanceOf(buyer1), 0);
+
+        // Try to approve tokens (should still work even with 0 balance)
+        vm.prank(buyer1);
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+
+        vm.prank(buyer1);
+        vm.expectRevert("Insufficient FLT balance");
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
+    }
+
+    function test_PurchaseTicket_InsufficientAllowance() public {
+        verificationRegistry.verifyUser(buyer1, true, false, false, IDENTITY_HASH_1);
+
+        vm.prank(organizer);
+        uint256 concertId = concertTicketNFT.createConcert(
+            "Test Concert", "Test Artist", "Test Venue", CONCERT_DATE, TOTAL_TICKETS, TICKET_PRICE, 1 hours, false, 1
+        );
+
+        // Warp time to avoid purchase interval restriction
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // Don't approve tokens or approve insufficient amount
+        vm.prank(buyer1);
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE - 1);
+
+        vm.prank(buyer1);
+        vm.expectRevert("Insufficient FLT allowance");
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
     }
 
     // ========== Resale Tests ==========
@@ -199,8 +263,12 @@ contract ConcertTicketNFTTest is Test {
         // Warp time to avoid purchase interval restriction
         vm.warp(block.timestamp + 1 hours + 1);
 
+        // Approve and purchase ticket
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 1, "A");
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+        
+        vm.prank(buyer1);
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
 
         uint256 ticketId = 1;
         uint256 resalePrice = TICKET_PRICE * 105 / 100; // 5% markup
@@ -210,9 +278,12 @@ contract ConcertTicketNFTTest is Test {
         vm.prank(buyer1);
         concertTicketNFT.listTicketForSale(ticketId, resalePrice, deadline);
 
-        // Buy resale ticket
+        // Approve FLT for buyer2 and buy resale ticket
         vm.prank(buyer2);
-        concertTicketNFT.buyResaleTicket{value: resalePrice}(1);
+        fltToken.approve(address(concertTicketNFT), resalePrice);
+        
+        vm.prank(buyer2);
+        concertTicketNFT.buyResaleTicket(1);
 
         // Verify ownership transfer
         assertEq(concertTicketNFT.ownerOf(ticketId), buyer2);
@@ -234,8 +305,12 @@ contract ConcertTicketNFTTest is Test {
         // Warp time to avoid purchase interval restriction
         vm.warp(block.timestamp + 1 hours + 1);
 
+        // Approve and purchase ticket
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 1, "A");
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+        
+        vm.prank(buyer1);
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
 
         uint256 ticketId = 1;
         uint256 excessivePrice = TICKET_PRICE * 120 / 100; // Exceeds 110% limit
@@ -260,8 +335,12 @@ contract ConcertTicketNFTTest is Test {
         // Warp time to avoid purchase interval restriction
         vm.warp(block.timestamp + 1 hours + 1);
 
+        // Approve and purchase ticket
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 1, "A");
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+        
+        vm.prank(buyer1);
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
 
         // Create a dummy signature with correct length (65 bytes)
         bytes memory signature = new bytes(65);
@@ -283,8 +362,12 @@ contract ConcertTicketNFTTest is Test {
         // Warp time to avoid purchase interval restriction
         vm.warp(block.timestamp + 1 hours + 1);
 
+        // Approve and purchase ticket
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 1, "A");
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE);
+        
+        vm.prank(buyer1);
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
 
         // Use ticket
         concertTicketNFT.useTicket(1);
@@ -340,14 +423,18 @@ contract ConcertTicketNFTTest is Test {
         uint256 baseTime = block.timestamp + 1 hours;
         vm.warp(baseTime);
 
+        // Approve FLT tokens for multiple purchases
+        vm.prank(buyer1);
+        fltToken.approve(address(concertTicketNFT), TICKET_PRICE * 2);
+
         // Purchase first ticket
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 1, "A");
+        concertTicketNFT.purchaseTicket(concertId, 1, "A");
 
         // Purchase second ticket with proper interval (MIN_PURCHASE_INTERVAL = 1 hour)
         vm.warp(baseTime + 1 hours + 1);
         vm.prank(buyer1);
-        concertTicketNFT.purchaseTicket{value: TICKET_PRICE}(concertId, 2, "A");
+        concertTicketNFT.purchaseTicket(concertId, 2, "A");
 
         uint256[] memory userTickets = concertTicketNFT.getUserTickets(buyer1);
         assertEq(userTickets.length, 2);

@@ -190,7 +190,7 @@ ARTIST="Taylor Swift"
 VENUE="Taipei Arena"
 DATE=$(($(date +%s) + 86400 * 30))  # 30天後
 TOTAL_TICKETS=1000
-PRICE=100000000000000000  # 0.1 ETH (18 decimals)
+PRICE=10000000000000000   # 0.01 ETH (18 decimals)
 COOLDOWN=3600  # 1小時轉售冷卻期
 WHITELIST_ONLY=false
 MIN_VERIFICATION=1
@@ -227,7 +227,7 @@ cast call $VERIFICATION_REGISTRY "verifications(address)" $TEST_USER --rpc-url $
 
 ```bash
 # 購買票券 (需要切換到買家帳戶)
-BUYER_PRIVATE_KEY=...  # 買家私鑰
+BUYER_PRIVATE_KEY=
 CONCERT_ID=1
 SEAT_NUMBER=1
 SEAT_SECTION="A"
